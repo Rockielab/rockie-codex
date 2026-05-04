@@ -1,0 +1,127 @@
+# ─── rockie repo .gitignore ─────────────────────────────────────────────
+# This file protects the rockie repo itself from accidental leakage by
+# contributors. For the file that gets merged into a USER's project on
+# install, see install-assets/gitignore.rockie-codex.
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.codex/hooks.json
+.cursor/
+.continue/
+.aider*
+
+# ─── Secrets — never commit any of these, ever ────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+.netrc
+.ssh/
+credentials.json
+credentials.yaml
+secrets/
+*.secret
+*.secrets
+service-account*.json
+gcp-*.json
+aws-credentials*
+known_hosts
+
+# ─── ML / research artifacts ──────────────────────────────────────────────
+# Never commit checkpoints, trained weights, or large data.
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+*.npz
+*.npy
+*.h5
+*.hdf5
+*.arrow
+*.parquet
+checkpoints/
+data/
+datasets/
+wandb/
+mlruns/
+outputs/
+lightning_logs/
+
+# ─── Harness runtime — never commit (per-project state) ──────────────────
+**/.codex/memory/workflow.db
+**/.codex/memory/workflow.db-*
+**/.codex/memory/hook.log*
+**/.codex/memory/ntfy_last_seen
+**/.codex/memory/rules-compiled.md
+**/.codex/.state/
+.team-runs/
+
+# Dogfood / development runtime at the rockie repo root — created when
+# a developer runs Codex or smoke-test from inside this checkout.
+/.codex/
+/.rockie/
+/project-extension/.state/
+/project-extension/codex/memory/workflow.db
+/project-extension/codex/memory/workflow.db-*
+
+# Per-project autopilot config is shell-sourced → never commit
+**/.codex/autopilot.conf
+**/.codex/budget.toml
+**/.codex/project_id
+
+# User-global Codex cache dirs — belt-and-suspenders, should never
+# appear in a project repo anyway
+.codex/file-history/
+.codex/session-env/
+.codex/history.jsonl
+
+# ─── Agent scratch — anything the agent needs but shouldn't share ────────
+# The canonical location for per-project agent state that is NOT part of
+# the harness (e.g. temp plots, draft findings, in-progress research notes).
+.codex/_local/
+
+# ─── User-confidential — stays on your box ───────────────────────────────
+# Convention: any dir or file named _private or _internal at any depth
+# is treated as "not for sharing." Drop your lab's NDA notes, unreleased
+# results, or competitive positioning here.
+_private/
+**/_private/
+docs/_internal/
+**/*.private.md
+NOTES_PRIVATE*
+
+# Logs
+*.log
+logs/

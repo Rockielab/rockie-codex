@@ -1,0 +1,199 @@
+# AGENTS.md
+
+> Generic rockie template. Drop this at the root of your project as
+> `AGENTS.md`, then edit the `Project` section at the bottom with your
+> specifics. The sections above the divider are the rockie harness
+> contract — don't rip them out unless you know what you're disabling.
+>
+> Historical note: some sections below use names like `/onboard` and
+> `/clean` as shorthand. In Codex, invoke those as skills via `$onboard`,
+> `$clean`, or natural language.
+
+## Where things go (plug-and-play map)
+
+| Location | Status | What lives here |
+|---|---|---|
+| `AGENTS.md`, `README.md`, `STATE.md`, `ARCHITECTURE.md`, `EXPERIMENT_LOG.md` | **TRACKED** | Public project docs, agent-readable. |
+| `.codex/hooks/`, `.codex/scripts/`, `.agents/skills/` | **TRACKED** | Harness logic — edits are shared with collaborators. |
+| `.codex/hooks.json` | **TRACKED** | Repo hook registrations. |
+| `~/.codex/hooks.json`, `~/.codex/config.toml` | user-global | Personal Codex config and home hooks, not repo content. |
+| `.codex/memory/workflow.db` | gitignored | Per-project learnings/queue/journal state. |
+| `.codex/.state/` | gitignored | Sentinels, pids, locks. |
+| `.codex/autopilot.conf`, `.codex/budget.toml` | gitignored | Shell-sourced configs — security-critical, never commit. |
+| `.codex/_local/` | gitignored | **Agent scratch.** Draft plots, temp notes, in-progress findings. Use freely. |
+| `_private/` at any depth | gitignored | **User-confidential** — NDA material, unreleased results, lab internals. |
+| `docs/_internal/` | gitignored | Your roadmap / competitive positioning / anything not for outside eyes. |
+| `*.private.md` | gitignored | One-off confidential docs alongside regular ones. |
+| `experiment-runs/` | user choice | Typically tracked (reproducibility), but gitignore it if runs contain sensitive data. |
+| `checkpoints/`, `wandb/`, `mlruns/`, `*.pt`, `*.ckpt` | gitignored | ML artifacts — never in the repo. |
+| `.env`, SSH keys, credentials | gitignored | Secrets — never in the repo, even if encrypted. |
+
+**If you're unsure where to put something, put it in `.codex/_local/`.**
+Nothing under that dir ever touches git.
+
+## Session onboarding (first prompt)
+
+On every new session, a `SessionStart` hook emits a status report into
+model context before your first user prompt lands. It covers:
+
+- Environment: `.env` presence, which keys are set
+- RunPod: authed user + running pods (with SSH endpoint) + EXITED pods (resumable)
+- Experiment queue: counts + top-priority pending item
+- Best-so-far results + last 3 experiments
+- Current stage
+- Tail of `SCHEDULED_NOTES.md` (where the previous scheduled run left off)
+
+**Whatever the user's opening prompt — even "hi" or blank — you must:**
+
+1. Read the session report that's already in context.
+2. Propose a single first action in ONE sentence.
+3. Wait for "go" / redirect before doing anything with side effects.
+
+If the user hasn't set `RUNPOD_API_KEY`, your first sentence asks them
+to. If there's an EXITED pod, offer to resume. If the queue has a top
+item and a running pod, propose running it. Be short.
+
+## Upstream-back — share the wealth
+
+If you discover a harness-level improvement that generalizes beyond this
+project (a new hook, a fix to an existing script, a useful skill), emit:
+
+```
+[LEARN harness-upstream] <one-line description of the improvement>
+```
+
+The `learn-capture.sh` Stop hook files this in the same DB as ordinary
+`[LEARN]` blocks, but tagged so `/propose-harness-change` can surface it
+later. When the user reviews, you can use `$propose-harness-change` to
+package the diff as a PR against the rockie source repo. Other users
+of rockie get the benefit; you get credit; the ecosystem grows. See
+`CONTRIBUTING.md` for the PR flow.
+
+Guardrail: the agent does NOT auto-push. The Generator/Verifier/Updater
+split lives in `.agents/skills/propose-harness-change/SKILL.md`.
+
+## Workflow: Plan → Research → Build → Audit → Run → Assess → Codify
+
+Every cycle should make the next cycle better.
+
+- **Plan:** Talk with the user. Understand the goal before touching code.
+- **Research:** Send agents to verify claims and check novelty. Never assert facts without evidence.
+- **Build:** Write code. Keep it clean. Comment the non-obvious.
+- **Audit:** Send a separate agent to review code before running. Check shapes, gradients, stability. The implementer does not review their own work.
+- **Run:** Use the hardware. Parallel experiments when possible.
+- **Assess:** Be honest. Negative results are data. Don't spin.
+- **Codify:** Update `STATE.md` and `EXPERIMENT_LOG.md`. If you learned a lesson, emit a `[LEARN]` block so it auto-saves to the learnings DB.
+
+## Learnings DB
+
+A SQLite DB at `.codex/memory/workflow.db` persists durable rules, corrections, and gotchas across sessions. Relevant rules auto-inject at prompt time via the `load-relevant-rules.sh` hook.
+
+**When you learn something worth persisting, emit a `[LEARN]` block in your response:**
+
+```
+[LEARN] <category>: <one-line rule>
+Mistake: <what went wrong>
+Correction: <what the right approach is>
+```
+
+The `learn-capture.sh` Stop hook parses these, dedupes by `(project, category, rule)`, and inserts. `Mistake:` and `Correction:` are optional but recommended.
+
+## Dead-end registry
+
+When you definitively kill a research direction — you've proven (via experiment, literature, or math) that it will not work — emit a `[DEAD-END]` block so future brainstorm agents don't re-propose it:
+
+```
+[DEAD-END] <direction-slug>: <reason it died, specific and falsifiable>
+Evidence: <path to EXPERIMENT_LOG entry, run dir, or paper citation>
+```
+
+The `deadend-capture.sh` Stop hook inserts it. On any brainstorm-shaped future prompt ("idea", "try", "what if", "explore"), the `load-relevant-deadends.sh` hook FTS5-matches and surfaces relevant dead-ends into prompt context.
+
+Use `[DEAD-END]` sparingly — only for directions that are truly, empirically dead. Ordinary "didn't work this time" goes in `[LEARN]`.
+
+## Hypothesis calibration
+
+Every experiment must log a **predicted metric delta** alongside the hypothesis. After the run, the actual delta is diffed. Over time, this reveals whether the agent's priors are getting better or drifting.
+
+Before any experiment, run:
+
+```bash
+python3 .codex/scripts/calibration.py add <run_id> "<hypothesis>" <metric> <predicted_delta>
+```
+
+After the run:
+
+```bash
+python3 .codex/scripts/calibration.py close <run_id> "<hypothesis>" <actual_delta>
+```
+
+`calibration.py report` shows the running scorecard: sign-correctness % and mean absolute error.
+
+## Pre-Experiment Checklist (MANDATORY before every experiment)
+
+1. **State the hypothesis in one sentence.** If you can't, don't run it.
+2. **Compute FLOPs, memory, and param count on paper.** 10 minutes. No exceptions.
+3. **Try to disprove it in 5 minutes.** "Is this known to fail?"
+4. **Check the literature first.** Send a research agent BEFORE building.
+5. **Design the comparison before the experiment.** What's the baseline? Matched fairly?
+6. **Define success criteria.** What improvement justifies the compute cost?
+7. **Verify the claim is novel.** Don't claim uniqueness without checking.
+
+## Waterfall for new ideas
+
+Before building ANYTHING, run this waterfall with subagents:
+
+1. **Brainstorm agent:** Generate ideas (read all project docs first).
+2. **Research agent:** Validate top ideas against literature, find code.
+3. **Attack agent:** Try to kill every idea. Find fatal flaws.
+4. **Validation agent:** Address each attack with evidence. Confirm or deny.
+
+Only build what survives all four stages.
+
+## Hard Rules (harness-level)
+
+These are generic, apply to any project using rockie:
+
+- Verify before claiming. Use web search or research agents.
+- Audit code with a separate agent before running.
+- Smoke test before any real run (forward, backward, gradient check where relevant).
+- Dead directions stay dead. Don't revisit archived ideas unless the user asks.
+- Save the exact script that was run alongside its results.
+- Log everything to a file; produce a human-readable summary at the end.
+
+Additional project-specific Hard Rules go in the `Project` section below.
+
+---
+
+## Project
+
+_Edit everything below to describe your project._
+
+### Repo Layout
+
+- `STATE.md` — Current state, what's running, dead ends
+- `ARCHITECTURE.md` — Design spec with verified citations
+- `EXPERIMENT_LOG.md` — Every experiment and result
+- `references.md` — Paper references library
+- `experiment-runs/` — Archived exact scripts from each experiment
+- `archive/` — Dead ends and superseded docs
+
+### Hardware
+
+_(list your dev box, GPUs, cloud, etc.)_
+
+### Data
+
+_(where does your data live? which files are authoritative? what's gitignored?)_
+
+### Research Direction
+
+_(one paragraph, editable each cycle)_
+
+### Project-specific Hard Rules
+
+_(add rules you've learned the hard way — these seed workflow.db on first run)_
+
+### User Context
+
+_(tell Codex who you are and how you want to work)_
