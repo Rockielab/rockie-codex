@@ -1,0 +1,46 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Shellcheck
+        run: |
+          find install.sh tests \
+            project-extension/codex/hooks \
+            project-extension/codex/scripts \
+            user-extension/codex/hooks \
+            -type f -name '*.sh' -print0 | xargs -0 shellcheck
+
+      - name: Python compile
+        run: |
+          find project-extension/codex/scripts project-extension/agents/skills tests/fakes \
+            -type f -name '*.py' -print0 | xargs -0 python3 -m py_compile
+
+      - name: Node syntax
+        run: |
+          node --check user-extension/codex/teams/orchestrator/index.js
+          node --check user-extension/codex/teams/orchestrator/orchestrator.js
+          node --check user-extension/codex/teams/orchestrator/iteration.js
+          node --check user-extension/codex/teams/orchestrator/state.js
+          node --check user-extension/codex/teams/orchestrator/worktree.js
+          node --check user-extension/codex/teams/orchestrator/dashboard-server.js
