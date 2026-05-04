@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rockie-codex Team Config",
+  "type": "object",
+  "required": ["name", "purpose", "agents"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$",
+      "description": "Team name — used in paths, so tight charset"
+    },
+    "purpose": {
+      "type": "string",
+      "description": "One-line description shown in dashboard header"
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "type": "string",
+          "default": "main",
+          "description": "Base branch for worktrees"
+        }
+      }
+    },
+    "context_files": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Repo-relative files to stage into the run dir's context/ so agents can read them (the sandbox blocks them from reading outside their worktree by default)"
+    },
+    "parallel": {
+      "type": "boolean",
+      "default": true,
+      "description": "Run agents in parallel (true) or sequentially (false)"
+    },
+    "max_iterations_per_agent": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10,
+      "description": "Safety cap; each agent self-declares done with AGENT_DONE"
+    },
+    "max_total_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 30,
+      "description": "Overall wall-clock cap"
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "motivation", "prompt"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$",
+            "description": "Agent name — validated pattern (used in paths, git branch names)"
+          },
+          "motivation": {
+            "type": "string",
+            "description": "Shown in dashboard card, sent to the agent in its initial prompt"
+          },
+          "model": {
+            "type": "string",
+            "enum": ["haiku", "sonnet", "opus", "gpt-5.4-mini", "gpt-5.4", "gpt-5.5"],
+            "default": "gpt-5.4",
+            "description": "Codex model name, or legacy Claude alias. Aliases map as haiku→gpt-5.4-mini, sonnet→gpt-5.4, opus→gpt-5.5."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The agent's initial task prompt"
+          },
+          "context_files": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Per-agent context files (in addition to team-level context_files)"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Legacy Claude allowlist entries. Accepted for compatibility, but ignored by codex exec."
+          }
+        }
+      }
+    }
+  }
+}

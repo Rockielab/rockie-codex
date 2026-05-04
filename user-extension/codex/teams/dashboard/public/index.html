@@ -1,0 +1,1580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Team Observatory</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+      :root {
+        /* Signal Observatory palette — deep cool base, warm amber accent */
+        --bg-0: #0a0d13;
+        --bg-1: #0f141d;
+        --bg-2: #151b27;
+        --bg-3: #1c2433;
+        --border: #232b3d;
+        --border-strong: #2e3a52;
+        --text-0: #e8ecf2;
+        --text-1: #b8bfcc;
+        --text-2: #8691a3;
+        --text-3: #5b6578;
+        --accent: #e5a74a; /* amber — primary signal */
+        --accent-dim: #8a6428;
+        --signal-running: #5aa6ff;
+        --signal-done: #8ed89a;
+        --signal-idle: #9b7cc4;
+        --signal-pending: #6c778b;
+        --signal-paused: #e5a74a;
+        --signal-error: #ff7d7d;
+        --signal-stopped: #6c778b;
+
+        --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+        --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+        --font-serif: "IBM Plex Serif", Georgia, serif;
+
+        --scroll-w: 10px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background: var(--bg-0);
+        color: var(--text-0);
+        font-size: 14px;
+        font-feature-settings: "ss01", "cv11"; /* plex stylistic alternates */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Subtle grid texture in the background — observatory vibe */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+        background-size: 48px 48px;
+        z-index: 0;
+      }
+
+      /* ─── Scrollbars — unified, unobtrusive ─────────────────────────── */
+      *::-webkit-scrollbar {
+        width: var(--scroll-w);
+        height: var(--scroll-w);
+      }
+      *::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      *::-webkit-scrollbar-thumb {
+        background: var(--border-strong);
+        border-radius: 0;
+        border: 3px solid transparent;
+        background-clip: content-box;
+      }
+      *::-webkit-scrollbar-thumb:hover {
+        background: var(--text-3);
+        background-clip: content-box;
+      }
+
+      /* ─── Header ───────────────────────────────────────────────────── */
+      header {
+        position: relative;
+        z-index: 2;
+        background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
+        border-bottom: 1px solid var(--border-strong);
+        padding: 14px 24px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 24px;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+      }
+      .brand .mark {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.18em;
+        color: var(--accent);
+        text-transform: uppercase;
+        padding: 3px 8px;
+        border: 1px solid var(--accent-dim);
+      }
+      .brand h1 {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 20px;
+        color: var(--text-0);
+        letter-spacing: -0.01em;
+      }
+      .brand .purpose {
+        font-size: 13px;
+        color: var(--text-2);
+        font-weight: 300;
+      }
+
+      .header-meta {
+        display: flex;
+        justify-content: center;
+        gap: 28px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+      .meta-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      .meta-label {
+        color: var(--text-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 9px;
+      }
+      .meta-value {
+        color: var(--text-0);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      .meta-value.live::before {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--signal-running);
+        margin-right: 6px;
+        vertical-align: middle;
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      .stop-team {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        padding: 8px 14px;
+        background: transparent;
+        border: 1px solid var(--signal-error);
+        color: var(--signal-error);
+        cursor: pointer;
+        transition:
+          background 140ms ease,
+          color 140ms ease;
+      }
+      .stop-team:hover {
+        background: var(--signal-error);
+        color: var(--bg-0);
+      }
+
+      /* ─── Main layout ──────────────────────────────────────────────── */
+      main {
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(380px, 28vw);
+        min-height: 0;
+        position: relative;
+        z-index: 1;
+      }
+      main.thread-expanded {
+        grid-template-columns: minmax(0, 1fr) minmax(560px, 42vw);
+      }
+
+      .agents-area {
+        overflow-y: auto;
+        padding: 20px 24px;
+        scrollbar-gutter: stable;
+      }
+      .agents-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+        gap: 16px;
+        align-content: start;
+      }
+
+      /* ─── Agent Card ───────────────────────────────────────────────── */
+      .agent-card {
+        background: var(--bg-1);
+        border: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        min-height: 440px;
+        max-height: calc(100vh - 120px);
+        overflow: hidden;
+        position: relative;
+      }
+      .agent-card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--agent-accent, var(--border-strong));
+      }
+
+      .agent-head {
+        padding: 14px 16px 10px 18px;
+        border-bottom: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: start;
+        flex-shrink: 0;
+      }
+      .agent-name {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-0);
+        letter-spacing: -0.01em;
+      }
+      .agent-motivation {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--text-2);
+        line-height: 1.45;
+        font-weight: 300;
+      }
+      .agent-head-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+      }
+
+      .status-chip {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--bg-0);
+      }
+      .status-chip::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .status-chip.running {
+        background: var(--signal-running);
+      }
+      .status-chip.done {
+        background: var(--signal-done);
+      }
+      .status-chip.idle {
+        background: var(--signal-idle);
+      }
+      .status-chip.pending {
+        background: var(--signal-pending);
+      }
+      .status-chip.paused {
+        background: var(--signal-paused);
+      }
+      .status-chip.awaiting_input {
+        background: var(--accent);
+      }
+      .status-chip.error {
+        background: var(--signal-error);
+      }
+      .status-chip.stopped {
+        background: var(--signal-stopped);
+      }
+      .status-chip.running::before {
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+
+      .agent-meta {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-3);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .agent-meta .dot {
+        color: var(--border-strong);
+      }
+
+      .agent-actions {
+        display: flex;
+        gap: 4px;
+        margin-top: 2px;
+      }
+      .agent-actions button {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 3px 7px;
+        background: transparent;
+        border: 1px solid var(--border-strong);
+        color: var(--text-2);
+        cursor: pointer;
+        transition: all 120ms ease;
+      }
+      .agent-actions button:hover {
+        background: var(--bg-3);
+        color: var(--text-0);
+      }
+      .agent-actions button.danger {
+        border-color: var(--signal-error);
+        color: var(--signal-error);
+      }
+      .agent-actions button.danger:hover {
+        background: var(--signal-error);
+        color: var(--bg-0);
+      }
+      .agent-actions button.warn {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .agent-actions button.warn:hover {
+        background: var(--accent);
+        color: var(--bg-0);
+      }
+
+      /* Tool/skill capability strip — expandable */
+      .agent-caps {
+        padding: 8px 18px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-0);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+        flex-shrink: 0;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        max-height: 28px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: max-height 240ms ease;
+      }
+      .agent-caps.expanded {
+        max-height: 240px;
+        overflow-y: auto;
+      }
+      .agent-caps .caps-toggle {
+        color: var(--text-3);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-size: 9px;
+      }
+      .agent-caps .cap-count {
+        color: var(--text-2);
+        padding: 2px 6px;
+        border: 1px solid var(--border);
+      }
+      .agent-caps .cap-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        align-items: center;
+        width: 100%;
+        margin-top: 6px;
+      }
+      .agent-caps .cap-group-label {
+        color: var(--text-3);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-right: 6px;
+        min-width: 64px;
+      }
+      .cap {
+        font-size: 10px;
+        padding: 1px 6px;
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        color: var(--text-1);
+        white-space: nowrap;
+      }
+
+      /* Event stream */
+      .event-stream {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 18px 14px;
+        scrollbar-gutter: stable;
+      }
+      .event-stream .empty {
+        padding: 30px 0;
+        text-align: center;
+        color: var(--text-3);
+        font-size: 12px;
+        font-style: italic;
+      }
+
+      /* Iteration boundary — precise hairline with label */
+      .event-iter {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 16px 0 8px;
+        color: var(--text-3);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+      .event-iter::before,
+      .event-iter::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      /* Thinking — low-key, collapsible */
+      .event-thinking {
+        margin: 6px 0;
+        background: var(--bg-2);
+        border-left: 2px solid var(--border-strong);
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+      .event-thinking details summary {
+        color: var(--text-3);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
+      }
+      .event-thinking details summary::before {
+        content: "▸ ";
+      }
+      .event-thinking details[open] summary::before {
+        content: "▾ ";
+      }
+      .event-thinking-body {
+        margin-top: 6px;
+        color: var(--text-2);
+        font-family: var(--font-sans);
+        font-style: italic;
+        font-weight: 300;
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+      }
+
+      /* Text block — markdown prose */
+      .event-text {
+        padding: 2px 0 6px;
+        color: var(--text-0);
+        line-height: 1.6;
+      }
+      .event-text > :first-child {
+        margin-top: 0;
+      }
+      .event-text > :last-child {
+        margin-bottom: 0;
+      }
+      .event-text p {
+        margin: 0 0 8px;
+      }
+      .event-text h1,
+      .event-text h2,
+      .event-text h3,
+      .event-text h4 {
+        font-family: var(--font-sans);
+        font-weight: 600;
+        margin: 10px 0 6px;
+        color: var(--text-0);
+      }
+      .event-text h1 {
+        font-size: 15px;
+      }
+      .event-text h2 {
+        font-size: 14px;
+      }
+      .event-text h3,
+      .event-text h4 {
+        font-size: 13px;
+      }
+      .event-text code {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 1px 5px;
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        color: var(--text-0);
+      }
+      .event-text pre {
+        margin: 8px 0;
+        padding: 10px 12px;
+        background: var(--bg-0);
+        border: 1px solid var(--border);
+        overflow-x: auto;
+        font-size: 12px;
+      }
+      .event-text pre code {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 12px;
+      }
+      .event-text ul,
+      .event-text ol {
+        padding-left: 20px;
+        margin: 4px 0 8px;
+      }
+      .event-text li {
+        margin: 2px 0;
+      }
+      .event-text strong {
+        font-weight: 600;
+        color: var(--text-0);
+      }
+      .event-text em {
+        color: var(--text-1);
+      }
+      .event-text blockquote {
+        margin: 6px 0;
+        padding: 2px 0 2px 12px;
+        border-left: 2px solid var(--border-strong);
+        color: var(--text-1);
+      }
+
+      /* Tool use — semantic per-tool formatting */
+      .event-tool {
+        margin: 4px 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px;
+        align-items: start;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+      }
+      .tool-badge {
+        padding: 2px 6px;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--bg-0);
+        background: var(--text-2);
+        height: fit-content;
+        white-space: nowrap;
+      }
+      .tool-Read .tool-badge { background: #6aa9ff; }
+      .tool-Write .tool-badge { background: #7fc089; }
+      .tool-Edit .tool-badge { background: #7fc089; }
+      .tool-MultiEdit .tool-badge { background: #7fc089; }
+      .tool-Bash .tool-badge { background: #e5a74a; }
+      .tool-Grep .tool-badge,
+      .tool-Glob .tool-badge { background: #b48be6; }
+      .tool-WebFetch .tool-badge,
+      .tool-WebSearch .tool-badge { background: #f47174; }
+      .tool-Task .tool-badge,
+      .tool-Agent .tool-badge { background: #e59355; }
+      .tool-TodoWrite .tool-badge,
+      .tool-TaskCreate .tool-badge,
+      .tool-TaskUpdate .tool-badge { background: #8a9fbf; }
+      .tool-NotebookEdit .tool-badge { background: #7fc089; }
+
+      .tool-body {
+        min-width: 0;
+      }
+      .tool-headline {
+        color: var(--text-0);
+        font-weight: 500;
+        line-height: 1.45;
+        word-break: break-word;
+      }
+      .tool-headline .path {
+        color: var(--accent);
+      }
+      .tool-headline .arg {
+        color: var(--text-1);
+      }
+      .tool-headline .faint {
+        color: var(--text-3);
+      }
+      .tool-sub {
+        color: var(--text-2);
+        font-size: 10.5px;
+        margin-top: 2px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 100px;
+        overflow: hidden;
+        position: relative;
+      }
+      .tool-sub.expanded { max-height: none; }
+      .tool-sub pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-family: inherit;
+      }
+
+      /* Tool result */
+      .event-tool-result {
+        margin: 2px 0 6px 30px;
+        padding: 6px 10px;
+        border-left: 1px solid var(--border);
+        background: var(--bg-2);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-2);
+        max-height: 140px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .event-tool-result.error {
+        border-left-color: var(--signal-error);
+        color: var(--signal-error);
+      }
+
+      /* Developer → agent events (DM or thread post, rendered in-stream) */
+      .event-dev-dm,
+      .event-dev-thread {
+        margin: 10px 0;
+        padding: 10px 14px;
+        background: linear-gradient(90deg, rgba(229, 167, 74, 0.10), transparent 80%);
+        border-left: 3px solid var(--accent);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .event-dev-thread {
+        background: linear-gradient(90deg, rgba(229, 167, 74, 0.06), transparent 80%);
+        border-left-color: var(--accent-dim);
+      }
+      .event-dev-dm .dev-head,
+      .event-dev-thread .dev-head {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 6px;
+      }
+      .event-dev-dm .dev-body,
+      .event-dev-thread .dev-body {
+        color: var(--text-0);
+      }
+      .event-dev-dm .dev-body p,
+      .event-dev-thread .dev-body p { margin: 0 0 4px; }
+      .event-dev-dm .dev-body :last-child,
+      .event-dev-thread .dev-body :last-child { margin-bottom: 0; }
+
+      /* DM footer */
+      .dm-footer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 6px;
+        padding: 10px 14px;
+        background: var(--bg-0);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .dm-footer input {
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        color: var(--text-0);
+        padding: 7px 10px;
+        font-family: var(--font-sans);
+        font-size: 12px;
+        outline: none;
+        transition: border-color 140ms ease;
+      }
+      .dm-footer input:focus {
+        border-color: var(--accent);
+      }
+      .dm-footer button {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 7px 14px;
+        background: transparent;
+        border: 1px solid var(--border-strong);
+        color: var(--text-1);
+        cursor: pointer;
+        transition: all 120ms ease;
+      }
+      .dm-footer button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* ─── Sidebar: Shared Thread ─────────────────────────────────── */
+      .sidebar {
+        background: var(--bg-1);
+        border-left: 1px solid var(--border-strong);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-width: 0;
+      }
+      .sidebar-head {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        background: linear-gradient(180deg, var(--bg-1), transparent);
+      }
+      .sidebar-head .title {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--accent);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .sidebar-head .count {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-3);
+      }
+      .expand-toggle {
+        background: none;
+        border: 1px solid var(--border-strong);
+        color: var(--text-2);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        padding: 3px 8px;
+        cursor: pointer;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        transition: all 120ms ease;
+      }
+      .expand-toggle:hover {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .thread {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 20px 8px;
+        scrollbar-gutter: stable;
+      }
+      .thread .empty {
+        padding: 40px 0;
+        text-align: center;
+        color: var(--text-3);
+        font-size: 13px;
+        font-style: italic;
+      }
+
+      .thread-post {
+        margin-bottom: 18px;
+        padding-left: 12px;
+        border-left: 2px solid var(--agent-accent, var(--border-strong));
+        cursor: pointer;
+        transition: opacity 140ms ease;
+      }
+      .thread-post:hover {
+        opacity: 0.92;
+      }
+      .thread-post-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .thread-post-author {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--agent-accent, var(--text-0));
+        letter-spacing: 0.02em;
+      }
+      .thread-post-ts {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-3);
+        white-space: nowrap;
+      }
+      .thread-post-content {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--text-1);
+      }
+      .thread-post-content > :first-child { margin-top: 0; }
+      .thread-post-content > :last-child { margin-bottom: 0; }
+      .thread-post-content p { margin: 0 0 6px; }
+      .thread-post-content strong { color: var(--text-0); font-weight: 600; }
+      .thread-post-content h1,
+      .thread-post-content h2,
+      .thread-post-content h3,
+      .thread-post-content h4 {
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        margin: 8px 0 4px;
+        color: var(--text-0);
+      }
+      .thread-post-content code {
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        padding: 1px 4px;
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+      }
+      .thread-post-content pre {
+        margin: 6px 0;
+        padding: 8px 10px;
+        background: var(--bg-0);
+        border: 1px solid var(--border);
+        font-size: 11.5px;
+        overflow-x: auto;
+      }
+      .thread-post-content pre code { background: none; border: none; padding: 0; }
+      .thread-post-content ul,
+      .thread-post-content ol { padding-left: 18px; margin: 4px 0 6px; }
+      .thread-post-content li { margin: 2px 0; }
+      .thread-post-content blockquote {
+        margin: 6px 0;
+        padding-left: 10px;
+        border-left: 2px solid var(--border-strong);
+        color: var(--text-2);
+      }
+
+      .thread-foot {
+        padding: 10px 16px 14px;
+        background: var(--bg-0);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .thread-foot textarea {
+        width: 100%;
+        min-height: 62px;
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        color: var(--text-0);
+        padding: 8px 10px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        line-height: 1.5;
+        resize: vertical;
+        outline: none;
+      }
+      .thread-foot textarea:focus {
+        border-color: var(--accent);
+      }
+      .thread-foot button {
+        margin-top: 8px;
+        width: 100%;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        padding: 9px 14px;
+        background: transparent;
+        border: 1px solid var(--accent-dim);
+        color: var(--accent);
+        cursor: pointer;
+        transition: all 140ms ease;
+      }
+      .thread-foot button:hover {
+        background: var(--accent);
+        color: var(--bg-0);
+        border-color: var(--accent);
+      }
+
+      /* Kbd help toast */
+      .kbd-hint {
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        padding: 6px 10px;
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        color: var(--text-3);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        opacity: 0.6;
+        z-index: 4;
+      }
+      .kbd-hint kbd {
+        padding: 1px 5px;
+        border: 1px solid var(--border-strong);
+        background: var(--bg-0);
+        color: var(--text-1);
+        border-radius: 2px;
+        font-size: 9px;
+      }
+
+      /* Utility: agent accent colors rotate through a palette */
+      .agent-0 { --agent-accent: #5aa6ff; }
+      .agent-1 { --agent-accent: #8ed89a; }
+      .agent-2 { --agent-accent: #b48be6; }
+      .agent-3 { --agent-accent: #f47174; }
+      .agent-4 { --agent-accent: #e5a74a; }
+      .agent-5 { --agent-accent: #60c7c7; }
+      .agent-dev { --agent-accent: var(--accent); }
+      .agent-sys { --agent-accent: var(--text-3); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <div class="mark">OBS</div>
+        <h1 id="team-name">loading…</h1>
+        <span class="purpose" id="team-purpose"></span>
+      </div>
+      <div class="header-meta">
+        <div class="meta-cell">
+          <span class="meta-label">elapsed</span>
+          <span class="meta-value live" id="elapsed">0m 0s</span>
+        </div>
+        <div class="meta-cell">
+          <span class="meta-label">agents</span>
+          <span class="meta-value" id="agent-count">—</span>
+        </div>
+        <div class="meta-cell">
+          <span class="meta-label">posts</span>
+          <span class="meta-value" id="post-count">0</span>
+        </div>
+      </div>
+      <button class="stop-team" onclick="stopTeam()">Stop Team</button>
+    </header>
+
+    <main id="main">
+      <div class="agents-area">
+        <div class="agents-grid" id="agents-grid">
+          <div class="empty" style="padding: 40px 0; color: var(--text-3); font-style: italic;">
+            connecting to team stream…
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <span class="title">Shared Thread</span>
+            <span class="count" id="post-count-side">—</span>
+          </div>
+          <button class="expand-toggle" onclick="toggleExpand()" id="expand-btn">Widen</button>
+        </div>
+        <div class="thread" id="thread">
+          <div class="empty">Thread empty — agents will post here as they work</div>
+        </div>
+        <div class="thread-foot">
+          <textarea
+            id="thread-post-input"
+            placeholder="Post to the whole team — Enter to send, Shift+Enter for newline"
+            onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); postToThread(); }"
+          ></textarea>
+          <button onclick="postToThread()">Post to Team</button>
+        </div>
+      </aside>
+    </main>
+
+    <div class="kbd-hint">
+      <kbd>?</kbd> shortcuts &nbsp; <kbd>W</kbd> widen thread &nbsp; <kbd>Esc</kbd> stop team
+    </div>
+
+    <script>
+      // ─── State ──────────────────────────────────────────────────────
+      let teamState = { agents: [], thread: [] };
+      const agentStreams = {};
+      const agentToolsCache = {};
+      const startTime = Date.now();
+
+      marked.setOptions({ breaks: true, gfm: true });
+
+      // ─── Helpers ────────────────────────────────────────────────────
+      const escHtml = (s) =>
+        String(s ?? "").replace(/[&<>"']/g, (c) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c]);
+
+      const truncate = (s, n = 240) =>
+        !s ? "" : s.length > n ? s.slice(0, n) + "…" : s;
+
+      const relativeTime = (iso) => {
+        if (!iso) return "";
+        const then = new Date(iso).getTime();
+        const now = Date.now();
+        const sec = Math.max(0, Math.round((now - then) / 1000));
+        if (sec < 5) return "just now";
+        if (sec < 60) return `${sec}s ago`;
+        const min = Math.round(sec / 60);
+        if (min < 60) return `${min}m ago`;
+        const hr = Math.round(min / 60);
+        return `${hr}h ago`;
+      };
+
+      const agentIndex = (name) => teamState.agents.findIndex((a) => a.name === name);
+
+      // Repo-relative path for display. repoRootPrefix is loaded from
+      // /api/config so this works for any repo, not just a specific repo.
+      let repoRootPrefix = null;
+      const prettyPath = (p) => {
+        if (!p) return "";
+        if (repoRootPrefix && p.startsWith(repoRootPrefix)) {
+          return p.slice(repoRootPrefix.length);
+        }
+        const parts = p.split("/");
+        if (parts.length > 3) return ".../" + parts.slice(-3).join("/");
+        return p;
+      };
+
+      // ─── Tool input pretty-printer ─────────────────────────────────
+      // Produces { headline (html), sub (raw text or '') }
+      function formatToolInput(name, input) {
+        input = input || {};
+        const P = (s) => `<span class="path">${escHtml(prettyPath(s))}</span>`;
+        const A = (s) => `<span class="arg">${escHtml(s)}</span>`;
+        const F = (s) => `<span class="faint">${escHtml(s)}</span>`;
+
+        switch (name) {
+          case "Read": {
+            const range =
+              input.offset || input.limit
+                ? ` ${F("lines " + (input.offset || 0) + "–" + ((input.offset || 0) + (input.limit || 0)))}`
+                : "";
+            return { headline: `${P(input.file_path)}${range}`, sub: "" };
+          }
+          case "Write": {
+            const size = input.content ? input.content.length : 0;
+            return {
+              headline: `${P(input.file_path)} ${F(`(${size} chars)`)}`,
+              sub: input.content ? truncate(input.content, 200) : "",
+            };
+          }
+          case "Edit":
+          case "MultiEdit": {
+            const head = `${P(input.file_path)}${input.replace_all ? " " + F("(all)") : ""}`;
+            const old_ = input.old_string || input.edits?.[0]?.old_string || "";
+            const new_ = input.new_string || input.edits?.[0]?.new_string || "";
+            const sub = old_ || new_
+              ? `− ${truncate(old_, 120)}\n+ ${truncate(new_, 120)}`
+              : "";
+            return { headline: head, sub };
+          }
+          case "Bash": {
+            const cmd = input.command || "";
+            const desc = input.description ? ` ${F("— " + input.description)}` : "";
+            return {
+              headline: `${A("$")} ${escHtml(truncate(cmd, 180))}${desc}`,
+              sub: cmd.length > 180 ? cmd : "",
+            };
+          }
+          case "Grep": {
+            const where = input.path ? ` in ${P(input.path)}` : "";
+            const mode = input.output_mode ? ` ${F("(" + input.output_mode + ")")}` : "";
+            return {
+              headline: `/${A(input.pattern || "")}/${where}${mode}`,
+              sub: "",
+            };
+          }
+          case "Glob": {
+            const where = input.path ? ` in ${P(input.path)}` : "";
+            return { headline: `${A(input.pattern || "")}${where}`, sub: "" };
+          }
+          case "WebFetch":
+            return {
+              headline: `${P(input.url || "")}`,
+              sub: input.prompt ? truncate(input.prompt, 180) : "",
+            };
+          case "WebSearch":
+            return { headline: `${A('"' + (input.query || "") + '"')}`, sub: "" };
+          case "Task":
+          case "Agent": {
+            const sub = input.subagent_type
+              ? ` ${F("[" + input.subagent_type + "]")}`
+              : "";
+            return {
+              headline: `${A(input.description || "task")}${sub}`,
+              sub: input.prompt ? truncate(input.prompt, 220) : "",
+            };
+          }
+          case "TodoWrite":
+          case "TaskCreate":
+          case "TaskUpdate":
+          case "TaskList":
+          case "TaskGet": {
+            const items = input.todos?.length || input.tasks?.length || 0;
+            return {
+              headline: items ? `${A(items + " item" + (items === 1 ? "" : "s"))}` : A(name),
+              sub: "",
+            };
+          }
+          case "NotebookEdit":
+            return { headline: `${P(input.notebook_path)}`, sub: "" };
+          default: {
+            // Generic: show first meaningful scalar field
+            const keys = Object.keys(input);
+            if (!keys.length) return { headline: F("(no args)"), sub: "" };
+            const k = keys[0];
+            const v = input[k];
+            if (typeof v === "string" && v.length < 120) {
+              return { headline: `${F(k + ":")} ${escHtml(v)}`, sub: "" };
+            }
+            return {
+              headline: F(keys.join(", ")),
+              sub: truncate(JSON.stringify(input), 200),
+            };
+          }
+        }
+      }
+
+      // ─── Event rendering ──────────────────────────────────────────
+      function renderEvent(event) {
+        if (event.type === "iteration_start") {
+          return `<div class="event-iter"><span>iteration ${event.iteration}</span></div>`;
+        }
+        if (event.type === "system") return ""; // init event handled via /api/agents/:name/tools
+
+        // Developer-originated events — synthesized by dashboard-server when
+        // the user DMs an agent or posts to the thread. Renders the user's
+        // message inline in the agent's stream so they see their input land.
+        if (event.type === "developer_dm") {
+          return `<div class="event-dev-dm">
+            <div class="dev-head">📨 you → this agent (DM)</div>
+            <div class="dev-body">${marked.parse(event.content || "")}</div>
+          </div>`;
+        }
+        if (event.type === "developer_thread_post") {
+          return `<div class="event-dev-thread">
+            <div class="dev-head">💬 you → everyone (thread)</div>
+            <div class="dev-body">${marked.parse(event.content || "")}</div>
+          </div>`;
+        }
+
+        if (event.type === "assistant" && event.message?.content) {
+          return event.message.content
+            .map((block) => {
+              if (block.type === "thinking") {
+                return `<div class="event-thinking"><details><summary>thinking</summary><div class="event-thinking-body">${escHtml(block.thinking || "")}</div></details></div>`;
+              }
+              if (block.type === "text") {
+                return `<div class="event-text">${marked.parse(block.text || "")}</div>`;
+              }
+              if (block.type === "tool_use") {
+                const toolClass = `tool-${block.name}`;
+                const { headline, sub } = formatToolInput(block.name, block.input);
+                const subHtml = sub
+                  ? `<div class="tool-sub" onclick="this.classList.toggle('expanded')"><pre>${escHtml(sub)}</pre></div>`
+                  : "";
+                return `<div class="event-tool ${toolClass}" data-tool-id="${block.id}">
+                  <span class="tool-badge">${escHtml(block.name)}</span>
+                  <div class="tool-body">
+                    <div class="tool-headline">${headline}</div>
+                    ${subHtml}
+                  </div>
+                </div>`;
+              }
+              return "";
+            })
+            .join("");
+        }
+        if (event.type === "user" && event.message?.content) {
+          return event.message.content
+            .map((block) => {
+              if (block.type === "tool_result") {
+                const isError = block.is_error === true;
+                const preview =
+                  typeof block.content === "string"
+                    ? block.content
+                    : Array.isArray(block.content)
+                    ? block.content.map((c) => c.text || "").join("\n")
+                    : "";
+                return `<div class="event-tool-result ${isError ? "error" : ""}">${escHtml(truncate(preview, 800))}</div>`;
+              }
+              return "";
+            })
+            .join("");
+        }
+        if (event.type === "result") {
+          const secs = ((event.duration_ms || 0) / 1000).toFixed(1);
+          const cost = event.total_cost_usd ? ` · $${event.total_cost_usd.toFixed(3)}` : "";
+          return `<div class="event-iter"><span>iteration complete · ${secs}s${cost}</span></div>`;
+        }
+        return "";
+      }
+
+      // ─── Capabilities strip ───────────────────────────────────────
+      async function loadToolsIntoCard(name) {
+        if (agentToolsCache[name]) {
+          return renderCapsStrip(name, agentToolsCache[name]);
+        }
+        try {
+          const r = await fetch(`/api/agents/${encodeURIComponent(name)}/tools`);
+          if (!r.ok) return;
+          const data = await r.json();
+          agentToolsCache[name] = data;
+          renderCapsStrip(name, data);
+        } catch {
+          /* init event not yet present — retry on state tick */
+        }
+      }
+
+      function renderCapsStrip(name, data) {
+        const strip = document.querySelector(`#card-${CSS.escape(name)} .agent-caps`);
+        if (!strip) return;
+        const toolCount = (data.tools || []).length;
+        const skillCount = (data.skills || []).length;
+        const agentCount = (data.agents || []).length;
+        const mcpCount = (data.mcp_servers || []).filter((m) => m.status === "connected").length;
+
+        const toolChips = (data.tools || [])
+          .map((t) => `<span class="cap">${escHtml(t)}</span>`)
+          .join("");
+        const skillChips = (data.skills || [])
+          .map((s) => `<span class="cap">${escHtml(s)}</span>`)
+          .join("");
+        const agentChips = (data.agents || [])
+          .map((a) => `<span class="cap">${escHtml(a)}</span>`)
+          .join("");
+        const mcpChips = (data.mcp_servers || [])
+          .filter((m) => m.status === "connected")
+          .map((m) => `<span class="cap">${escHtml(m.name)}</span>`)
+          .join("");
+
+        strip.innerHTML = `
+          <span class="caps-toggle">CAPABILITIES</span>
+          <span class="cap-count">${toolCount} tools</span>
+          <span class="cap-count">${skillCount} skills</span>
+          <span class="cap-count">${agentCount} subagents</span>
+          ${mcpCount ? `<span class="cap-count">${mcpCount} MCP</span>` : ""}
+          ${toolChips ? `<div class="cap-group"><span class="cap-group-label">Tools</span>${toolChips}</div>` : ""}
+          ${skillChips ? `<div class="cap-group"><span class="cap-group-label">Skills</span>${skillChips}</div>` : ""}
+          ${agentChips ? `<div class="cap-group"><span class="cap-group-label">Subagents</span>${agentChips}</div>` : ""}
+          ${mcpChips ? `<div class="cap-group"><span class="cap-group-label">MCP</span>${mcpChips}</div>` : ""}
+        `;
+      }
+
+      // ─── Agent card ───────────────────────────────────────────────
+      function renderAgentCard(agent, idx) {
+        const s = agent.state || {};
+        const cssName = CSS.escape(agent.name);
+        return `
+          <div class="agent-card agent-${idx % 6}" id="card-${cssName}" data-agent="${escHtml(agent.name)}">
+            <div class="agent-head">
+              <div>
+                <div class="agent-name">${escHtml(agent.name)}</div>
+                <div class="agent-motivation">${escHtml(agent.motivation || "")}</div>
+              </div>
+              <div class="agent-head-right">
+                <span class="status-chip ${s.status || "pending"}">${s.status || "pending"}</span>
+                <div class="agent-meta">
+                  <span>${escHtml(agent.model || "sonnet")}</span>
+                  <span class="dot">·</span>
+                  <span>iter ${s.iteration || 0}</span>
+                </div>
+                <div class="agent-actions"></div>
+              </div>
+            </div>
+            <div class="agent-caps" onclick="this.classList.toggle('expanded')">
+              <span class="caps-toggle">Capabilities</span>
+              <span class="cap-count">loading…</span>
+            </div>
+            <div class="event-stream" id="stream-${cssName}">
+              <div class="empty">Waiting for first iteration…</div>
+            </div>
+            <div class="dm-footer">
+              <input
+                type="text"
+                id="dm-${cssName}"
+                placeholder="Direct message ${escHtml(agent.name)}…"
+                onkeydown="if (event.key === 'Enter') sendDM('${escHtml(agent.name)}')"
+              />
+              <button onclick="sendDM('${escHtml(agent.name)}')">DM</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderAgents() {
+        const grid = document.getElementById("agents-grid");
+        if (!teamState.agents.length) {
+          grid.innerHTML = '<div class="empty" style="padding: 40px 0; color: var(--text-3); font-style: italic;">no agents</div>';
+          return;
+        }
+        const expectedIds = teamState.agents.map((a) => `card-${CSS.escape(a.name)}`);
+        const existingIds = [...grid.querySelectorAll(".agent-card")].map((c) => c.id);
+        if (JSON.stringify(existingIds) !== JSON.stringify(expectedIds)) {
+          grid.innerHTML = teamState.agents.map(renderAgentCard).join("");
+          for (const a of teamState.agents) {
+            subscribeToEvents(a.name);
+            loadToolsIntoCard(a.name);
+          }
+        }
+        // Update badges + actions
+        for (const agent of teamState.agents) {
+          const card = document.getElementById(`card-${CSS.escape(agent.name)}`);
+          if (!card) continue;
+          const s = agent.state || {};
+          const chip = card.querySelector(".status-chip");
+          if (chip) {
+            chip.className = `status-chip ${s.status || "pending"}`;
+            chip.textContent = s.status || "pending";
+          }
+          const meta = card.querySelector(".agent-meta");
+          if (meta) {
+            meta.innerHTML =
+              `<span>${escHtml(agent.model || "sonnet")}</span>
+               <span class="dot">·</span>
+               <span>iter ${s.iteration || 0}</span>` +
+              (s.last_seen_ts
+                ? `<span class="dot">·</span><span>${escHtml(relativeTime(s.last_seen_ts))}</span>`
+                : "");
+          }
+          const actions = card.querySelector(".agent-actions");
+          if (actions) {
+            if (s.status === "idle" || s.status === "running") {
+              actions.innerHTML = `
+                <button class="warn" onclick="pauseAgent('${escHtml(agent.name)}')">Pause</button>
+                <button class="danger" onclick="stopAgent('${escHtml(agent.name)}')">Stop</button>`;
+            } else if (s.status === "paused") {
+              actions.innerHTML = `<button onclick="resumeAgent('${escHtml(agent.name)}')">Resume</button>`;
+            } else {
+              actions.innerHTML = "";
+            }
+          }
+          // Lazy-load caps if not yet
+          if (!agentToolsCache[agent.name] && (s.status === "running" || s.status === "idle" || s.status === "done")) {
+            loadToolsIntoCard(agent.name);
+          }
+        }
+        document.getElementById("agent-count").textContent = teamState.agents.length;
+      }
+
+      // ─── Multiplexed SSE event stream ────────────────────────────
+      // One connection carries events for every agent, tagged by name.
+      // Fixes the browser HTTP/1.1 6-connection limit: with 8+ agents,
+      // per-agent SSE connections queued indefinitely and the last 2–3
+      // cards froze on "Waiting for first iteration…".
+      let multiplexConnected = false;
+      function connectAgentEvents() {
+        if (multiplexConnected) return;
+        multiplexConnected = true;
+        const es = new EventSource("/api/agents-events/stream");
+        es.addEventListener("agent_event", (ev) => {
+          let msg;
+          try {
+            msg = JSON.parse(ev.data);
+          } catch {
+            return;
+          }
+          const { agent: agentName, event } = msg;
+          if (!agentName || !event) return;
+          const stream = document.getElementById(`stream-${CSS.escape(agentName)}`);
+          if (!stream) return; // card not mounted yet; events sit in events.jsonl
+          if (!agentStreams[agentName]) agentStreams[agentName] = { first: true };
+          const st = agentStreams[agentName];
+          if (st.first) {
+            stream.innerHTML = "";
+            st.first = false;
+          }
+          const html = renderEvent(event);
+          if (!html) return;
+          const atBottom =
+            stream.scrollHeight - stream.scrollTop - stream.clientHeight < 80;
+          stream.insertAdjacentHTML("beforeend", html);
+          if (atBottom) stream.scrollTop = stream.scrollHeight;
+        });
+      }
+
+      // Kept as a no-op stub so existing callers don't break — the real
+      // subscription is the single multiplex connection above.
+      function subscribeToEvents(_agentName) {
+        connectAgentEvents();
+      }
+
+      // ─── Shared thread render ────────────────────────────────────
+      function renderThread() {
+        const container = document.getElementById("thread");
+        const posts = teamState.thread.filter(
+          (p) => !p.author.includes("Team Thread"),
+        );
+        document.getElementById("post-count").textContent = posts.length;
+        document.getElementById("post-count-side").textContent =
+          posts.length + (posts.length === 1 ? " post" : " posts");
+        if (!posts.length) {
+          container.innerHTML =
+            '<div class="empty">Thread empty — agents will post here as they work</div>';
+          return;
+        }
+        container.innerHTML = posts
+          .map((p) => {
+            const rawAuthor = p.author.trim();
+            // Render the human's stored label "developer" as "you" in the UI.
+            const displayAuthor = rawAuthor === "developer" ? "you" : rawAuthor;
+            let cls = "thread-post";
+            if (rawAuthor === "developer") cls += " agent-dev";
+            else if (rawAuthor === "orchestrator") cls += " agent-sys";
+            else {
+              const idx = agentIndex(rawAuthor);
+              if (idx >= 0) cls += ` agent-${idx % 6}`;
+            }
+            return `<div class="${cls}" onclick="jumpToAgent('${escHtml(rawAuthor)}')">
+              <div class="thread-post-head">
+                <span class="thread-post-author">${escHtml(displayAuthor)}</span>
+                <span class="thread-post-ts" title="${escHtml(p.ts)}">${escHtml(relativeTime(p.ts))}</span>
+              </div>
+              <div class="thread-post-content">${marked.parse(p.content || "")}</div>
+            </div>`;
+          })
+          .join("");
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function jumpToAgent(name) {
+        const card = document.getElementById(`card-${CSS.escape(name)}`);
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      // ─── Team-state SSE ──────────────────────────────────────────
+      function connectSSE() {
+        const es = new EventSource("/api/stream");
+        es.addEventListener("state", (e) => {
+          teamState = JSON.parse(e.data);
+          renderAgents();
+          renderThread();
+        });
+      }
+
+      async function loadInitial() {
+        // Kick off the single multiplex SSE immediately so events queue
+        // in agentStreams even if cards mount a moment later.
+        connectAgentEvents();
+        try {
+          const cfg = await fetch("/api/config").then((r) => r.json());
+          document.getElementById("team-name").textContent = cfg.name;
+          if (cfg.repo_root) {
+            repoRootPrefix = cfg.repo_root.endsWith("/")
+              ? cfg.repo_root
+              : cfg.repo_root + "/";
+          }
+          // Show repo name prominently — the tool is global, so the team could
+          // be running in any of the user's repos. Make that visible at a glance.
+          const purposeEl = document.getElementById("team-purpose");
+          if (cfg.repo_name) {
+            purposeEl.innerHTML = `<span style="font-family: var(--font-mono); color: var(--accent); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; margin-right: 10px;">${escHtml(cfg.repo_name)}</span>${escHtml(cfg.purpose || "")}`;
+          } else {
+            purposeEl.textContent = cfg.purpose || "";
+          }
+        } catch {}
+        connectSSE();
+      }
+
+      // Elapsed timer + relative-time refresh
+      setInterval(() => {
+        const ms = Date.now() - startTime;
+        document.getElementById("elapsed").textContent =
+          `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+        renderThread(); // updates relative-time strings
+      }, 1000);
+
+      // ─── Intervention RPCs ───────────────────────────────────────
+      async function post(url, body = {}) {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        return r.json();
+      }
+      async function postToThread() {
+        const t = document.getElementById("thread-post-input");
+        if (!t.value.trim()) return;
+        await post("/api/interventions/thread-post", { content: t.value });
+        t.value = "";
+      }
+      async function sendDM(target) {
+        const input = document.getElementById(`dm-${CSS.escape(target)}`);
+        const content = input.value.trim();
+        if (!content) return;
+        await post("/api/interventions/direct-message", { target, content });
+        input.value = "";
+      }
+      async function stopAgent(name) {
+        await post("/api/interventions/stop-agent", { target: name });
+      }
+      async function pauseAgent(name) {
+        await post("/api/interventions/pause-agent", { target: name });
+      }
+      async function resumeAgent(name) {
+        await post("/api/interventions/resume-agent", { target: name });
+      }
+      async function stopTeam() {
+        if (!confirm("Stop all agents?")) return;
+        await post("/api/interventions/stop-team");
+      }
+
+      // ─── Expand toggle ───────────────────────────────────────────
+      function toggleExpand() {
+        const m = document.getElementById("main");
+        m.classList.toggle("thread-expanded");
+        document.getElementById("expand-btn").textContent =
+          m.classList.contains("thread-expanded") ? "Narrow" : "Widen";
+      }
+
+      // ─── Keyboard shortcuts ──────────────────────────────────────
+      document.addEventListener("keydown", (e) => {
+        if (e.target.matches("input, textarea")) return;
+        if (e.key === "w" || e.key === "W") toggleExpand();
+        if (e.key === "Escape") stopTeam();
+        if (e.key === "?") {
+          alert(
+            "Shortcuts:\n  W — widen/narrow thread\n  Esc — stop team\n  Click a thread post — jump to that agent's card\n  Click a tool-input preview — expand/collapse",
+          );
+        }
+      });
+
+      loadInitial();
+    </script>
+  </body>
+</html>

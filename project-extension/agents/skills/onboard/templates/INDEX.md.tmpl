@@ -1,0 +1,40 @@
+---
+name: ${name}
+generated_at: ${generated_at}
+tier_completed: ${tier}
+soft_topics:
+${soft_topics_yaml}
+---
+
+# Researcher: ${name}
+
+${one_line_identity}
+
+## What this corpus contains
+
+- `SOUL.md` — identity, worldview, hot takes
+- `STYLE.md` — written + spoken voice
+- `METHODOLOGY.md` — rigor standards, success criteria
+- `DISMISSALS.md` — append-only "never again" log
+- `MEMORY.md` — append-only experience log
+
+## Quickref (machine-parseable, agent reads first)
+
+```yaml
+risk_threshold: ${risk_threshold}
+core_dismissals:
+${core_dismissals_yaml}
+
+core_beliefs:
+${core_beliefs_yaml}
+soft_topics: ${soft_topics_inline}
+```
+
+## Loading
+
+Agents auto-load this `INDEX.md` on every session via SessionStart.
+Full files load on keyword match (`/taste-load methodology`,
+`/taste-load dismissals`, etc.).
+
+To refresh: `/onboard --redo` (full rewrite, archives prior corpus)
+or `/onboard --section <name>` (one file).

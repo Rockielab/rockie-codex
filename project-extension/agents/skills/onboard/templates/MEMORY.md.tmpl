@@ -1,0 +1,28 @@
+---
+file: MEMORY.md
+schema_version: 1
+last_updated: ${generated_at}
+append_only: true
+---
+
+# MEMORY — append-only session and experience log
+
+Cross-session log of what happened, what was tried, and what was
+learned. This is the long-form companion to the `[LEARN]` SQLite DB:
+where `[LEARN]` captures discrete rules, MEMORY captures the
+narrative those rules emerged from.
+
+Entry header convention:
+
+```
+## YYYY-MM-DD [tag]: one-line summary
+```
+
+Tags: `experiment`, `learning`, `pivot`, `failure`, `success`,
+`paper`, `infra`.
+
+<!-- APPEND_HERE -->
+
+## ${generated_at} [onboarding]: corpus first written
+
+${onboarding_summary_block}

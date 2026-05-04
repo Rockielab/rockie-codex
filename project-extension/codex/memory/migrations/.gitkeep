@@ -1,0 +1,13 @@
+# Schema migrations live here, named <NNN>_<slug>.sql
+#
+# init_db.sh reads PRAGMA user_version from the DB and applies every
+# migration file whose NNN prefix exceeds the current version, in order.
+# After applying, init_db sets PRAGMA user_version = NNN.
+#
+# Example:
+#   001_initial.sql  (baseline — ships implicitly as schema.sql)
+#   002_add_cost_column.sql  → ALTER TABLE experiments ADD COLUMN cost REAL;
+#   003_backfill_status.sql  → UPDATE ...
+#
+# Keep each migration idempotent where possible. Never delete columns;
+# always add. Prefer backward-compatible changes.

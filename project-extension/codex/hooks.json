@@ -1,0 +1,86 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/session-report.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/learn-capture.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/deadend-capture.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/correction-detect.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/load-relevant-rules.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/load-relevant-deadends.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/stuck-detector.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/stage-inject.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/budget-reconcile.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/doc-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/pre-commit-gate.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/pre-train-gate.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/budget-gate.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

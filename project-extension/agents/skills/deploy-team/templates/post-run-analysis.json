@@ -1,0 +1,26 @@
+{
+  "name": "post-run-analysis",
+  "purpose": "Three-lens interpretation of a completed experiment result. Checks for confirmation bias and produces a balanced writeup seed.",
+  "parallel": false,
+  "max_total_minutes": 12,
+  "agents": [
+    {
+      "name": "positive",
+      "motivation": "What DID this result show? What's the strongest honest interpretation?",
+      "model": "sonnet",
+      "prompt": "You are the POSITIVE-spin analyst.\n\nResult under analysis: {{TOPIC}}\n\nContext files in ./context/ (results, scripts, prior experiments):\n{{CONTEXT_FILES}}\n\nYour job: given only what the data shows, what is the strongest HONEST claim that can be made? No overclaiming — the user has strong anti-overclaim rules in AGENTS.md — but no understating either.\n\n- What signal is clearly present?\n- What's the narrowest hypothesis the result supports?\n- What follow-up would strengthen this signal further?\n\nAppend findings to ./thread.md. Write a 'strongest honest claim' paragraph to ./output.md. End with AGENT_DONE. Then on a new line add a fenced json block like:\n```json\n{\"key_findings\": [\"...\", \"...\"], \"recommendation\": \"one-sentence summary\"}\n```"
+    },
+    {
+      "name": "adversarial",
+      "motivation": "What COULDN'T this result show? What confounds remain? What's the nastiest alternative interpretation?",
+      "model": "opus",
+      "prompt": "You are the ADVERSARIAL analyst.\n\nResult under analysis: {{TOPIC}}\n\nContext files in ./context/:\n{{CONTEXT_FILES}}\n\nFind the strongest alternative interpretation. Specifically:\n- What confounds are unresolved? (seed variance, dataset idiosyncrasies, unmatched params, cache state)\n- Is there a trivial null model that would produce this result?\n- Is the metric what it seems? (BPB vs BPC, accuracy on biased splits, rank measurement artifacts)\n- Is the comparison fair? (pretraining data, iteration count, optimizer state)\n- Did the experiment actually test what it claimed to test?\n\nRead the positive analyst's thread posts for their claim, then attack it.\n\nAppend to ./thread.md. Write your nastiest-plausible alternative interpretation + the specific control that would disambiguate it to ./output.md. End with AGENT_DONE. Then on a new line add a fenced json block like:\n```json\n{\"key_findings\": [\"...\", \"...\"], \"recommendation\": \"one-sentence summary\"}\n```"
+    },
+    {
+      "name": "contextualizer",
+      "motivation": "Where does this fit in the larger story? Does it change the research direction?",
+      "model": "sonnet",
+      "prompt": "You are the CONTEXTUALIZER.\n\nResult under analysis: {{TOPIC}}\n\nContext files in ./context/ including prior experiments, KILL_LIST.md, STATE.md:\n{{CONTEXT_FILES}}\n\nYour job: place this result in the trajectory of the project.\n\n- Does it confirm or complicate prior findings?\n- Does it move a hypothesis from untested → supported → falsified?\n- Does it change the priority ordering of the experiment queue?\n- Does it suggest a direction is dead (belongs on KILL_LIST)?\n- Does it suggest a new direction worth adding to the queue?\n\nRead both the positive and adversarial posts on the thread before writing.\n\nAppend to ./thread.md. Write a 'what this means for the project' paragraph + specific queue/kill-list update recommendations to ./output.md. End with AGENT_DONE. Then on a new line add a fenced json block like:\n```json\n{\"key_findings\": [\"...\", \"...\"], \"recommendation\": \"one-sentence summary\"}\n```"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+# ─── rockie-codex harness block — managed by install.sh ───────────────
+# Do not edit between the BEGIN and END markers. install.sh will refresh
+# this block on upgrades while preserving user rules outside it.
+
+# BEGIN rockie-codex
+.codex/memory/workflow.db
+.codex/memory/workflow.db-*
+.codex/memory/hook.log*
+.codex/memory/ntfy_last_seen
+.codex/memory/zcm_events.jsonl
+.codex/memory/autopilot_events.jsonl
+.codex/memory/autopilot.log
+.codex/memory/rules-compiled.md
+.codex/.state/
+.codex/autopilot.conf
+.codex/budget.toml
+.codex/project_id
+.codex/_local/
+.team-runs/
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+id_ecdsa*
+.netrc
+credentials.json
+credentials.yaml
+secrets/
+*.secret
+service-account*.json
+
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+*.npz
+checkpoints/
+wandb/
+mlruns/
+
+_private/
+**/_private/
+docs/_internal/
+**/*.private.md
+NOTES_PRIVATE*
+
+.rockie/taste/
+.rockie/taste/.draft.json
+.rockie/taste/.archive/
+# END rockie-codex

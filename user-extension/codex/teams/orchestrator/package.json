@@ -1,0 +1,17 @@
+{
+  "name": "rockie-codex-team-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-agent team orchestrator for rockie-codex — spawns codex exec agents in worktrees, coordinates via a shared thread, and serves a live dashboard.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
