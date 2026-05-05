@@ -71,3 +71,28 @@ When this skill fires, the agent should:
 
 If a user invokes `/clean` directly (not agent-automatic), print the
 report in human-readable form and wait for their direction on fixes.
+
+## Post-audit hook
+
+After the sentinel writes successfully (zero blockers), surface a
+soft-prompt to the user — once per audit, never auto-invoked:
+
+> Audit clean. Anything in this session worth upstreaming to
+> `saml212/rockie-codex`? Run `$upstream-contribute` to scan the
+> session for generalizable patterns (pruning fixes, small skill
+> improvements, new hooks, cross-discipline capabilities) and dispatch
+> a writer sub-agent to fork, branch, smoke-test, and open a PR.
+
+Rules for this nudge:
+
+- Print only when the audit passes with zero blockers.
+- Print at most once per audit run; suppress on re-runs in the same
+  session.
+- Never auto-invoke `$upstream-contribute` — the user opts in by
+  invoking the skill explicitly. The meta-loop is user-driven, not
+  automatic.
+- If `[LEARN harness-upstream]` or `[LEARN cross-discipline]` rows
+  were added in the last 6 hours, prepend a one-line teaser noting
+  the count. (Optional polish; skip if querying the DB would slow
+  the audit.)
+
