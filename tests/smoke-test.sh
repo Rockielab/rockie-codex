@@ -392,6 +392,19 @@ rm "$PROJ/.codex/.state/clean-ok-$HASH"
 echo "$IN" | bash "$PROJ/.codex/hooks/pre-commit-gate.sh" >/dev/null 2>&1
 assert "pre-commit-gate: missing sentinel → block (exit 2)" "2" "$?"
 
+# clean-finalize.sh: writes sentinel AND emits upstream-contribute nudge
+# on stderr. Replaces the prose-only "Post-audit hook" — the nudge is
+# now a deterministic side-effect of the script, not agent discretion.
+[ -x "$PROJ/.codex/scripts/clean-finalize.sh" ] && ok "clean-finalize: script installed and executable" || fail "clean-finalize: missing or not executable"
+rm -f "$PROJ"/.codex/.state/clean-ok-*
+NUDGE_OUT=$(bash "$PROJ/.codex/scripts/clean-finalize.sh" testhash123 2>&1 >/dev/null)
+[ -f "$PROJ/.codex/.state/clean-ok-testhash123" ] && ok "clean-finalize: writes sentinel at expected path" || fail "clean-finalize: sentinel missing"
+echo "$NUDGE_OUT" | grep -q 'upstream-contribute' && ok "clean-finalize: nudge mentions upstream-contribute on stderr" || fail "clean-finalize: nudge missing upstream-contribute"
+echo "$NUDGE_OUT" | grep -q 'saml212/rockie-codex' && ok "clean-finalize: nudge references saml212/rockie-codex" || fail "clean-finalize: nudge missing upstream repo"
+[ -n "$NUDGE_OUT" ] && ok "clean-finalize: stderr nudge is non-empty" || fail "clean-finalize: stderr empty"
+bash "$PROJ/.codex/scripts/clean-finalize.sh" >/dev/null 2>&1
+assert "clean-finalize: missing hash arg → exit 2" "2" "$?"
+
 # ── 15. FTS5 hyphen-safety note ──────────────────────────────────────────
 section "installer hooks merge"
 # Verify install.sh merges into pre-existing hooks.json without clobbering.
