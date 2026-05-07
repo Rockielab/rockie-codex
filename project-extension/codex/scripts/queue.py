@@ -50,7 +50,7 @@ def session_id() -> str:
 
 
 def connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB, isolation_level=None)  # autocommit
+    conn = sqlite3.connect(str(DB), isolation_level=None)  # autocommit
     conn.execute("PRAGMA trusted_schema=1")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row

@@ -68,7 +68,7 @@ def session_id() -> str:
 
 
 def connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(str(DB))
     conn.execute("PRAGMA trusted_schema=1")
     conn.row_factory = sqlite3.Row
     return conn

@@ -97,7 +97,7 @@ def sqlite_ok() -> sqlite3.Connection | None:
     if not DB.exists():
         return None
     try:
-        conn = sqlite3.connect(DB)
+        conn = sqlite3.connect(str(DB))
         conn.execute("PRAGMA trusted_schema=1")
         conn.row_factory = sqlite3.Row
         return conn

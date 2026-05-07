@@ -78,7 +78,7 @@ SEEDS = [
 
 
 def main() -> None:
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(str(DB))
     conn.execute("PRAGMA trusted_schema=1")
     cur = conn.cursor()
     inserted, skipped = 0, 0
