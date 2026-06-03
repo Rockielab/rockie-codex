@@ -76,8 +76,8 @@ class NoCapacity(ProviderError):
 class GpuType:
     """A GPU type a provider offers.
 
-    `id` is the provider's native identifier (e.g. "NVIDIA H100 80GB HBM3"
-    on RunPod, "H100_SXM" on Vast, "H100_80GB" on Prime). Pass it back
+    `id` is the provider's native identifier (formats vary by adapter,
+    e.g. "NVIDIA H100 80GB HBM3", "H100_SXM", "H100_80GB"). Pass it back
     verbatim to price() / create_spot() — providers parse their own.
     """
 
@@ -90,13 +90,13 @@ class GpuType:
 class Price:
     """Snapshot price for a gpu_type at a point in time.
 
-    Either tier may be None: Prime returns min_bid=None when no spot
-    row exists for the requested type. On-demand-only providers (if
+    Either tier may be None: some adapters return min_bid=None when no
+    spot row exists for the requested type. On-demand-only providers (if
     any are added later) would set min_bid==on_demand.
 
     `gpu_type_id` carries whatever the provider's create_spot() needs to
-    re-fetch — may be the raw gpu_type, an opaque offer_id (Vast), or a
-    cloudId (Prime). Treat as opaque downstream.
+    re-fetch — may be the raw gpu_type, an opaque offer_id, or a
+    cloud-specific id. Treat as opaque downstream.
     """
 
     min_bid: float | None
@@ -111,9 +111,9 @@ class SpotSpec:
     """Create-pod request passed to Provider.create_spot().
 
     `extras` carries provider-specific knobs that don't generalize across
-    the fleet — e.g. RunPod's `secure` (SECURE-cloud filter) and
-    `min_vcpu`/`min_ram`, Vast's `reliability_min`, TensorDock's
-    `bid_per_vm`. Each adapter documents the keys it reads from extras.
+    the fleet — e.g. a `secure` (secure-cloud filter) flag,
+    `min_vcpu`/`min_ram`, a `reliability_min` host-quality floor, or a
+    per-VM bid. Each adapter documents the keys it reads from extras.
     Keeps the shared shape clean while letting power users hit
     provider-specific levers without a Protocol bump.
     """
@@ -125,7 +125,7 @@ class SpotSpec:
     bid: float | None = None  # None → adapter uses provider's current min
     image: str = ""  # provider-default if empty
     name: str = "rockie-spot"
-    ssh_key_id: str | None = None  # required by Prime; some others optional
+    ssh_key_id: str | None = None  # required by some adapters; optional on others
     region: str | None = None
     env: dict[str, str] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
@@ -137,7 +137,7 @@ class Pod:
 
     `id` is unique within a provider, NOT globally — always pair with
     `provider` when persisting. `metadata` is provider-specific extras
-    (e.g. Vast stashes machine_id and geolocation there).
+    (e.g. some adapters stash a machine_id and geolocation there).
     """
 
     id: str
@@ -195,7 +195,7 @@ class Spend:
 class Provider(Protocol):
     """Contract every adapter implements. See module docstring for design rules."""
 
-    name: str  # short slug: "runpod", "vast", "prime", ...
+    name: str  # short opaque adapter slug (e.g. "a", "b", ...)
     supports_bid_auction: bool  # True if a spot/bid tier exists
     supports_pause_preserve: bool  # True if stop() preserves volume on this provider
     preemption_signal: Literal["none", "warning-secs", "hard-kill"]
