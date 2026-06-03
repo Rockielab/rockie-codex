@@ -153,9 +153,9 @@ emit start "autopilot online pid=$$"
 python3 "$ROOT/scripts/queue.py" reap --older-than-hours 1 >&2 || true
 
 # Reconcile spend on startup so the budget gate has truthful numbers.
-if [ -n "${RUNPOD_API_KEY:-}" ]; then
-  python3 "$ROOT/scripts/runpod.py" reconcile --quiet >/dev/null 2>&1 || true
-fi
+# gpu.py routes through the configured adapter(s) and exits cleanly when
+# none is wired, so this is safe to call unconditionally.
+python3 "$ROOT/scripts/gpu.py" reconcile --quiet >/dev/null 2>&1 || true
 
 ITERATION=0
 CONSECUTIVE_FAILURES=0

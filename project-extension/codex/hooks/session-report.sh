@@ -27,7 +27,7 @@ fi
 bash "$ROOT/scripts/rotate_hook_log.sh" 2>/dev/null
 echo "[$(date -Iseconds)] session-report: fired" >> "$ROOT/memory/hook.log"
 
-# Load .env so session_report.py sees RUNPOD_API_KEY etc.
+# Load .env so session_report.py sees GPU_API_KEY etc.
 if [ -f "$REPO/.env" ]; then
   set -a
   . "$REPO/.env" 2>/dev/null

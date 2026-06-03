@@ -23,8 +23,6 @@ import shutil
 import sqlite3
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from typing import Optional
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent           # .codex/
@@ -55,7 +53,7 @@ def env_status() -> list[tuple[str, str, str]]:
     # We don't read .env directly — we trust whatever was sourced. But we
     # tell the user which vars are/aren't set right now.
     for var, purpose in [
-        ("RUNPOD_API_KEY", "spot-GPU provisioning"),
+        ("GPU_API_KEY", "GPU compute provisioning"),
         ("NTFY_TOPIC", "push notifications (optional)"),
     ]:
         val = os.environ.get(var, "").strip()
@@ -68,28 +66,27 @@ def env_status() -> list[tuple[str, str, str]]:
     return rows
 
 
-def check_runpod_auth() -> Optional[tuple[str, list[dict]]]:
-    """If RUNPOD_API_KEY is set, try auth + list pods. Returns (user_email, pods) or None."""
-    key = os.environ.get("RUNPOD_API_KEY", "").strip()
-    if not key:
+def gpu_pods_status(conn: sqlite3.Connection | None) -> Optional[list[dict]]:
+    """Read tracked GPU pods from the local reconciled gpu_pods table.
+
+    The router (gpu.py reconcile, fired by hooks/budget-reconcile.sh and
+    autopilot startup) keeps this table current against live compute
+    state. Reading it here keeps SessionStart fast and offline — no
+    provider API call, no supplier identity — while still surfacing what
+    is running. Returns a list of pod dicts, or None if the table is
+    absent/unreadable.
+    """
+    if conn is None:
         return None
-    import json as _json
-    q = '{"query": "query { myself { email pods { id name desiredStatus runtime { ports { ip isIpPublic privatePort publicPort } } } } }"}'
     try:
-        req = urllib.request.Request(
-            f"https://api.runpod.io/graphql?api_key={key}",
-            data=q.encode(),
-            headers={
-                "content-type": "application/json",
-                "user-agent": "rockie-session-report/0.1",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = _json.loads(resp.read().decode())
-        me = (data.get("data") or {}).get("myself") or {}
-        return (me.get("email", ""), me.get("pods") or [])
-    except Exception:
+        rows = conn.execute(
+            "SELECT id, status, gpu_type, gpu_count, ssh_endpoint "
+            "FROM gpu_pods "
+            "WHERE status NOT IN ('TERMINATED', 'GONE') "
+            "ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    except sqlite3.Error:
         return None
 
 
@@ -194,14 +191,11 @@ def _mode_conflicts(mode: dict) -> list:
     hw = mode.get("hardware") or {}
     pref = hw.get("preferred_provider")
     if pref:
-        env_var = {
-            "runpod": "RUNPOD_API_KEY",
-            "vast": "VAST_API_KEY",
-            "prime": "PRIME_API_KEY",
-            "verda": "DATACRUNCH_CLIENT_ID",
-        }.get(pref)
-        if env_var and not os.environ.get(env_var, "").strip():
-            out.append(f"mode prefers '{pref}' but {env_var} is unset")
+        # A mode may pin a preferred adapter slug, but the credential is
+        # always surfaced under one generic env var — the broker hides
+        # which supplier it maps to.
+        if not os.environ.get("GPU_API_KEY", "").strip():
+            out.append(f"mode prefers '{pref}' but GPU_API_KEY is unset")
     if hw.get("spot_only") and os.environ.get("ROCKIE_GPU_MODE") == "none":
         out.append("mode requires spot GPUs but ROCKIE_GPU_MODE=none")
     return out
@@ -321,45 +315,35 @@ def render() -> str:
         out.append(f"- {mark} **{name}** — {detail}")
     out.append("")
 
-    # ── RunPod pods ────────────────────────────────────────────────────
-    pods_info = check_runpod_auth()
-    if pods_info is None:
-        if os.environ.get("RUNPOD_API_KEY"):
-            out.append("## RunPod")
-            out.append(f"- {WARN} API key set but auth query failed (network? key valid?)")
-            out.append("")
-    else:
-        email, pods = pods_info
-        out.append("## RunPod")
-        out.append(f"- {OK} authed as `{email}`")
-        running = [p for p in pods if p.get("desiredStatus") == "RUNNING"]
-        stopped = [p for p in pods if p.get("desiredStatus") in ("EXITED", "STOPPED")]
+    # ── GPU compute pods ────────────────────────────────────────────────
+    # Sourced from the local reconciled gpu_pods table (kept current by
+    # `gpu.py reconcile`), not a provider API — no supplier identity, no
+    # network call at SessionStart.
+    pods = gpu_pods_status(sqlite_ok())
+    if pods is not None and pods:
+        out.append("## GPU compute")
+        running = [p for p in pods if (p.get("status") or "").upper() == "RUNNING"]
+        stopped = [p for p in pods if (p.get("status") or "").upper() in ("EXITED", "STOPPED", "PREEMPTED")]
         if running:
             for p in running:
-                rt = p.get("runtime") or {}
-                ports = rt.get("ports") or []
-                ssh = next((x for x in ports if x.get("privatePort") == 22), None)
-                endpoint = f"ssh root@{ssh['ip']} -p {ssh['publicPort']}" if ssh else "(no ssh port)"
-                out.append(f"- {OK} **{p['id']}** ({p.get('name','')}) RUNNING — `{endpoint}`")
+                endpoint = p.get("ssh_endpoint") or "(no ssh endpoint recorded)"
+                gpu = f"{p.get('gpu_type','?')}×{p.get('gpu_count','?')}"
+                out.append(f"- {OK} **{p['id']}** ({gpu}) RUNNING — `{endpoint}`")
         if stopped:
             for p in stopped:
-                # EXITED = spot preemption. The right response is NOT a
-                # higher bid on the same provider — it's trying a
-                # different provider at THAT provider's minimum, or
-                # simply resuming at the same provider's current min
-                # bid (via `runpod.py resume` with NO --bid, which now
-                # defaults to minimumBidPrice).
+                # EXITED/PREEMPTED on a spot tier. The right response is
+                # NOT a higher bid — resume at the current minimum via the
+                # router, which picks a supplier behind the broker.
+                gpu = f"{p.get('gpu_type','?')}×{p.get('gpu_count','?')}"
                 out.append(
-                    f"- {WARN} **{p['id']}** ({p.get('name','')}) {p['desiredStatus']} "
+                    f"- {WARN} **{p['id']}** ({gpu}) {p.get('status','?')} "
                     f"— likely spot preemption. Resume at current min bid: "
-                    f"`python3 .codex/scripts/runpod.py resume {p['id']} --yes`"
+                    f"`python3 .codex/scripts/gpu.py resume {p['id']} --yes`"
                 )
                 out.append(
-                    f"  _(If preempted multiple times in a row, hop to a different provider "
-                    f"rather than bumping the bid — see `scripts/gpu.py` when available.)_"
+                    f"  _(If preempted repeatedly, the router rotates the underlying "
+                    f"supplier automatically — don't bump the bid.)_"
                 )
-        if not running and not stopped:
-            out.append(f"- {MISS} no pods found")
         out.append("")
 
     # ── Queue / journal ────────────────────────────────────────────────
@@ -446,7 +430,7 @@ def render() -> str:
     out.append("0. **If `taste/` corpus is absent, propose `/onboard` BEFORE anything else.** "
                "The corpus shapes how the agent makes every downstream decision; running "
                "experiments without it means the harness can't model what the researcher cares about.")
-    out.append("1. If `RUNPOD_API_KEY` is missing, ask the user to populate `.env`.")
+    out.append("1. If `GPU_API_KEY` is missing, ask the user to populate `.env`.")
     out.append("2. If a pod is RUNNING, treat its SSH endpoint as the compute target.")
     out.append("3. If the queue has a pending top item, propose running it next.")
     out.append("4. If the queue is empty, propose `/queue-refill` before anything else.")

@@ -244,9 +244,8 @@ def reconcile_all(providers: list[Provider], *, verbose: bool = False) -> dict[s
     """Pull live state from each provider, recompute per-pod accrued
     dollars, SUM into budget_usage[project:<p>:dollars].
 
-    This is the canonical implementation. scripts/runpod.py's
-    single-provider reconcile is being kept in sync until it's thinned;
-    this one supersedes it for cross-provider.
+    This is the canonical (and sole) reconcile implementation: it queries
+    every configured adapter, so it works whether one or many are wired.
 
     Returns a dict summary the CLI prints.
     """
@@ -969,14 +968,14 @@ def main() -> int:
     cp.add_argument("--image", default="")
     cp.add_argument("--name", default="rockie-spot")
     cp.add_argument("--env", nargs="*", default=[], help="KEY=VALUE pairs")
-    cp.add_argument("--secure", action="store_true", help="(RunPod) use SECURE-cloud only")
+    cp.add_argument("--secure", action="store_true", help="Restrict to secure-cloud datacenters only (adapter-specific)")
     cp.add_argument("--min-vcpu", type=int, default=4)
     cp.add_argument("--min-ram", type=int, default=16)
-    cp.add_argument("--reliability-min", type=float, default=0.95, help="(Vast) host-quality floor")
+    cp.add_argument("--reliability-min", type=float, default=0.95, help="Host-quality floor (adapter-specific)")
     cp.add_argument(
         "--ssh-key-id-env",
-        default="PRIME_SSH_KEY_ID",
-        help="Env var holding the SSH key id (Prime needs it)",
+        default="GPU_SSH_KEY_ID",
+        help="Env var holding the SSH key id (required by some adapters)",
     )
     cp.add_argument(
         "--allow-on-demand",
@@ -1014,7 +1013,7 @@ def main() -> int:
     _add_providers_arg(rsp)
     rsp.add_argument("pod_id")
     rsp.add_argument("--provider", required=True)
-    rsp.add_argument("--bid", type=float, help="(RunPod) spot bid; bid=None on RunPod = on-demand")
+    rsp.add_argument("--bid", type=float, help="Spot bid $/GPU-hr; omit for on-demand resume (adapter-specific)")
     rsp.add_argument("--yes", action="store_true")
     rsp.set_defaults(func=cmd_resume)
 

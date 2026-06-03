@@ -292,13 +292,13 @@ CREATE TABLE IF NOT EXISTS code_pool (
 CREATE INDEX IF NOT EXISTS idx_pool_project ON code_pool(project, score);
 
 -- ─── gpu_pods — provider-provisioned compute, tracked for budget reconcile ─
--- Lifted from runpod.py:_db() (lazy-create) into the baseline so migrations
--- 002+003 (which ALTER this table) apply cleanly on fresh DBs. Without this,
+-- Created in the baseline (rather than lazily) so migrations 002+003
+-- (which ALTER this table) apply cleanly on fresh DBs. Without this,
 -- init_db.sh aborts during migration 002 because gpu_pods doesn't exist
 -- until something else creates it lazily — broken ordering.
 CREATE TABLE IF NOT EXISTS gpu_pods (
   id           TEXT PRIMARY KEY,                  -- provider-given pod id
-  provider     TEXT NOT NULL DEFAULT 'runpod',
+  provider     TEXT NOT NULL DEFAULT 'gpu',       -- opaque adapter slug; supplied by the router
   gpu_type     TEXT,
   gpu_count    INTEGER,
   bid_per_gpu  REAL,
