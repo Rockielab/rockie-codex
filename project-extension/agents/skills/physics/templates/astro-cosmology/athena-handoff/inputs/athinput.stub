@@ -1,0 +1,34 @@
+# Athena++ input stub for HPC handoff review only.
+<job>
+problem_id = blast_smoke
+
+<time>
+cfl_number = 0.3
+nlim = 20
+tlim = 0.01
+dt = 1.0e-4
+
+<mesh>
+nx1 = 32
+x1min = -0.5
+x1max = 0.5
+ix1_bc = outflow
+ox1_bc = outflow
+nx2 = 32
+x2min = -0.5
+x2max = 0.5
+ix2_bc = outflow
+ox2_bc = outflow
+nx3 = 32
+x3min = -0.5
+x3max = 0.5
+ix3_bc = outflow
+ox3_bc = outflow
+
+<output1>
+file_type = hst
+dt = 0.001
+
+<output2>
+file_type = rst
+dt = 0.005

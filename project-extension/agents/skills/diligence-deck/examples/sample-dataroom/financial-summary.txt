@@ -1,0 +1,51 @@
+SYNTHETIC DATA -- FOR TESTING ONLY -- NOT A REAL COMPANY OR DEAL
+
+ACME DATASYNC INC. -- FINANCIAL SUMMARY (SYNTHETIC FY2025)
+
+All figures in USD thousands. Audited by Fictional Audit LLP (synthetic).
+
+INCOME STATEMENT SUMMARY
+--------------------------
+Total Revenue:              8,200
+  Subscription ARR:         7,100
+  Professional Services:    1,100
+Cost of Revenue:            1,970  (24% of revenue)
+Gross Profit:               6,230  (76% gross margin)
+
+Operating Expenses:
+  Sales & Marketing:        2,870  (35% of revenue)
+  Research & Development:   1,640  (20% of revenue)
+  General & Administrative:   984  (12% of revenue)
+Total OpEx:                 5,494
+
+EBITDA:                       736  (9% EBITDA margin)
+D&A:                           82
+EBIT:                         654
+
+Non-recurring items (addbacks):
+  Founder salary above market rate:    320  (replacement cost est. $180K)
+  One-time legal settlement FY2024:    150  (resolved; no recurrence)
+Adjusted EBITDA:            1,206  (15% adj. EBITDA margin)
+
+BALANCE SHEET HIGHLIGHTS (synthetic as of 2025-12-31)
+-------------------------------------------------------
+Cash & equivalents:         1,840
+Accounts receivable:          920  (avg DSO: 41 days)
+Total current assets:       2,980
+Total assets:               3,420
+
+Accounts payable:             310
+Deferred revenue:             890
+Total current liabilities:  1,320
+Total liabilities:          1,420
+Total equity:               2,000
+
+KEY METRICS
+-----------
+ARR (as of 2025-12-31):     7,400  (includes Jan 2026 signed contracts)
+NRR (Net Revenue Retention): 112%  (synthetic; FY2025 cohort)
+Logo churn rate:              8%   (synthetic; FY2025)
+Customers:                   103   (synthetic)
+ACV (avg contract value):    $82K  (synthetic)
+
+NOTE: All figures are synthetic test data. Do not use for any real analysis.

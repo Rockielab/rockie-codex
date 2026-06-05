@@ -1,0 +1,29 @@
+{
+  "profile_id": "common.default.v1",
+  "domain": "common",
+  "family": "baseline",
+  "expected_duration_class": "medium",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 300, "max_gap_seconds": 1800},
+  "metrics": [
+    {"name": "provider_state", "unit": "state", "kind": "status", "source": "provider", "required": true},
+    {"name": "gpu_utilization", "unit": "percent", "kind": "timeseries", "source": "provider", "required": false},
+    {"name": "gpu_memory_used", "unit": "MiB", "kind": "timeseries", "source": "provider", "required": false},
+    {"name": "cpu_utilization", "unit": "percent", "kind": "timeseries", "source": "provider", "required": false},
+    {"name": "system_memory_used", "unit": "MiB", "kind": "timeseries", "source": "provider", "required": false},
+    {"name": "disk_usage", "unit": "percent", "kind": "timeseries", "source": "provider", "required": false},
+    {"name": "stdout_freshness", "unit": "s", "kind": "gauge", "source": "log", "required": true},
+    {"name": "artifact_freshness", "unit": "s", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "spend_so_far", "unit": "cents", "kind": "timeseries", "source": "billing", "required": false}
+  ],
+  "panels": [
+    {"id": "compute_health", "title": "Compute health", "metric_names": ["provider_state", "gpu_utilization", "gpu_memory_used", "cpu_utilization", "system_memory_used", "disk_usage"]},
+    {"id": "freshness", "title": "Freshness", "metric_names": ["stdout_freshness", "artifact_freshness", "spend_so_far"]}
+  ],
+  "red_flags": [
+    {"id": "gpu_idle_window", "severity": "warn", "condition": "GPU utilization stays near zero for a GPU-bound job across the configured heartbeat window", "recommended_action": "inspect logs, confirm the workload is actually running, and tighten cadence until the run is healthy"},
+    {"id": "disk_danger", "severity": "stop", "condition": "disk usage crosses the configured danger threshold and artifact preservation is safe", "recommended_action": "preserve outputs, stop or shrink output generation, and propose a relaunch with lower artifact pressure"}
+  ],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "safe_to_auto_stop": false,
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["artifact_path", "provider_metadata", "private_endpoint", "license_token"]}
+}

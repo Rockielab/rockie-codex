@@ -1,0 +1,21 @@
+{
+  "profile_id": "physics.force_fields.v1",
+  "domain": "physics",
+  "family": "force_fields",
+  "expected_duration_class": "short",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 300, "max_gap_seconds": 1800},
+  "metrics": [
+    {"name": "parameterization_status", "unit": "state", "kind": "event", "source": "parser", "required": true},
+    {"name": "missing_parameters", "unit": "count", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "charge_assignment", "unit": "state", "kind": "event", "source": "parser", "required": true},
+    {"name": "water_ion_compatibility", "unit": "state", "kind": "event", "source": "parser", "required": true},
+    {"name": "bad_contacts", "unit": "count", "kind": "gauge", "source": "artifact", "required": false},
+    {"name": "parameter_provenance_records", "unit": "count", "kind": "gauge", "source": "parser", "required": true},
+    {"name": "minimization_result", "unit": "state", "kind": "event", "source": "parser", "required": true},
+    {"name": "minimization_rms_force", "unit": "kcal/mol/A", "kind": "gauge", "source": "parser", "required": false}
+  ],
+  "panels": [{"id": "audit", "title": "Parameter Audit", "metric_names": ["parameterization_status", "missing_parameters", "charge_assignment", "water_ion_compatibility", "bad_contacts", "parameter_provenance_records", "minimization_result", "minimization_rms_force"]}],
+  "red_flags": [{"id": "missing_required_parameter", "severity": "stop", "condition": "any bonded/nonbonded term is unresolved", "recommended_action": "stop before dynamics and create a failure Note with parameter provenance gaps"}],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["license_server", "module_path", "restricted_parameter_path"]}
+}

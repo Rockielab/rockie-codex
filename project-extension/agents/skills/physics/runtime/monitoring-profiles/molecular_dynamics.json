@@ -1,0 +1,26 @@
+{
+  "profile_id": "physics.molecular_dynamics.v1",
+  "domain": "physics",
+  "family": "molecular_dynamics",
+  "expected_duration_class": "medium",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 300, "max_gap_seconds": 1800},
+  "metrics": [
+    {"name": "simulation_time", "unit": "ps", "kind": "timeseries", "source": "log", "required": true},
+    {"name": "wall_time", "unit": "s", "kind": "timeseries", "source": "log", "required": false},
+    {"name": "temperature", "unit": "K", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "pressure", "unit": "bar", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "total_energy", "unit": "kcal/mol", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "potential_energy", "unit": "kcal/mol", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "kinetic_energy", "unit": "kcal/mol", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "energy_drift", "unit": "kcal/mol/ns", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "density", "unit": "g/cm^3", "kind": "timeseries", "source": "log", "required": false},
+    {"name": "timestep", "unit": "fs", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "trajectory_freshness", "unit": "s", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "neighbor_list_warnings", "unit": "count", "kind": "event", "source": "log", "required": true},
+    {"name": "constraint_warnings", "unit": "count", "kind": "event", "source": "log", "required": true}
+  ],
+  "panels": [{"id": "thermo", "title": "Thermodynamics", "metric_names": ["temperature", "pressure", "total_energy", "energy_drift", "neighbor_list_warnings", "constraint_warnings"]}],
+  "red_flags": [{"id": "energy_drift_high", "severity": "stop", "condition": "energy drift exceeds smoke threshold, total energy explodes, neighbor-list warnings persist, or constraint warnings appear", "recommended_action": "preserve artifacts, inspect timestep, constraints, neighbor list, and force-field setup"}],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["license_server", "module_path"]}
+}

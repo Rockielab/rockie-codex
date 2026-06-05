@@ -1,0 +1,22 @@
+# WarpX input stub for HPC handoff review only.
+# Copy to an authorized WarpX environment and fill validated domain values.
+max_step = 20
+amr.n_cell = 32 32 64
+amr.max_grid_size = 32
+geometry.dims = 3
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 1.0e-3 1.0e-3 2.0e-3
+algo.maxwell_solver = yee
+warpx.cfl = 0.75
+particles.species_names = electrons ions
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2 2
+ions.charge = q_e
+ions.mass = m_p
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 2 2 2
+diagnostics.diags_names = diag1
+diag1.intervals = 10
+diag1.format = openpmd
