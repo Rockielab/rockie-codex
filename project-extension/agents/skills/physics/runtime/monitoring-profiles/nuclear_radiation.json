@@ -1,0 +1,18 @@
+{
+  "profile_id": "physics.nuclear_radiation.v1",
+  "domain": "physics",
+  "family": "nuclear_radiation",
+  "expected_duration_class": "hpc",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 300, "max_gap_seconds": 1800},
+  "metrics": [
+    {"name": "histories", "unit": "count", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "tallies", "unit": "count", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "relative_error", "unit": "fraction", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "shannon_entropy", "unit": "arb", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "missing_cross_section_data", "unit": "count", "kind": "event", "source": "log", "required": true}
+  ],
+  "panels": [{"id": "statistics", "title": "Transport Statistics", "metric_names": ["histories", "tallies", "relative_error", "shannon_entropy", "missing_cross_section_data"]}],
+  "red_flags": [{"id": "missing_cross_sections", "severity": "stop", "condition": "required nuclide data or authorized library path missing", "recommended_action": "stop before compute and ask for authorized data path or open-source fallback"}],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["license_server", "module_path", "cross_section_library_path"]}
+}

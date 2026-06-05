@@ -1,0 +1,18 @@
+{
+  "profile_id": "physics.particle_transport_collision.v1",
+  "domain": "physics",
+  "family": "particle_transport_collision",
+  "expected_duration_class": "medium",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 300, "max_gap_seconds": 1800},
+  "metrics": [
+    {"name": "generated_events", "unit": "count", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "histories", "unit": "count", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "cross_section", "unit": "pb", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "rejection_rate", "unit": "fraction", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "output_file_growth", "unit": "bytes", "kind": "timeseries", "source": "artifact", "required": false}
+  ],
+  "panels": [{"id": "events", "title": "Events and Transport", "metric_names": ["generated_events", "histories", "cross_section", "rejection_rate", "output_file_growth"]}],
+  "red_flags": [{"id": "geometry_or_conservation_warning", "severity": "needs_human", "condition": "geometry overlap, conservation, or excessive rejection warning appears", "recommended_action": "pause and inspect cards, geometry, materials, seed, and cuts"}],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["license_server", "module_path"]}
+}

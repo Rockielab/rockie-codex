@@ -1,0 +1,30 @@
+{
+  "profile_id": "experiment.ml_baseline.v1",
+  "domain": "experiment",
+  "family": "ml_training",
+  "expected_duration_class": "long",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 240, "max_gap_seconds": 1800},
+  "metrics": [
+    {"name": "step", "unit": "count", "kind": "timeseries", "source": "log", "required": true},
+    {"name": "epoch", "unit": "count", "kind": "timeseries", "source": "log", "required": false},
+    {"name": "loss", "unit": "scalar", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "accuracy", "unit": "percent", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "perplexity", "unit": "scalar", "kind": "timeseries", "source": "parser", "required": false},
+    {"name": "learning_rate", "unit": "scalar", "kind": "timeseries", "source": "log", "required": false},
+    {"name": "samples_per_second", "unit": "samples/s", "kind": "timeseries", "source": "log", "required": false},
+    {"name": "checkpoint_freshness", "unit": "s", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "gradient_nan_flags", "unit": "count", "kind": "event", "source": "log", "required": true},
+    {"name": "eval_divergence", "unit": "scalar", "kind": "event", "source": "parser", "required": false}
+  ],
+  "panels": [
+    {"id": "optimization", "title": "Optimization", "metric_names": ["step", "epoch", "loss", "accuracy", "perplexity", "learning_rate", "samples_per_second"]},
+    {"id": "checkpoints", "title": "Checkpoint health", "metric_names": ["checkpoint_freshness", "gradient_nan_flags", "eval_divergence"]}
+  ],
+  "red_flags": [
+    {"id": "loss_divergence", "severity": "warn", "condition": "loss or perplexity diverges, evaluation metrics regress, or checkpoint freshness stalls", "recommended_action": "preserve the latest checkpoint, inspect optimizer state, and reduce cadence gap while the run is unstable"},
+    {"id": "nan_detected", "severity": "stop", "condition": "gradients, activations, or loss become NaN or Inf and the profile marks the stop path as safe", "recommended_action": "stop after preserving artifacts, diagnose the batch or optimizer issue, and require a relaunch diff plus budget recheck"}
+  ],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "safe_to_auto_stop": false,
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["artifact_path", "provider_metadata", "private_endpoint", "dataset_path"]}
+}

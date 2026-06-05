@@ -1,0 +1,20 @@
+{
+  "profile_id": "physics.astro_cosmology.v1",
+  "domain": "physics",
+  "family": "astro_cosmology",
+  "expected_duration_class": "hpc",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 300, "max_gap_seconds": 1800},
+  "metrics": [
+    {"name": "simulation_time", "unit": "code_time", "kind": "timeseries", "source": "log", "required": true},
+    {"name": "redshift", "unit": "z", "kind": "timeseries", "source": "log", "required": false},
+    {"name": "conserved_quantity_drift", "unit": "fraction", "kind": "timeseries", "source": "parser", "required": true},
+    {"name": "timestep_hierarchy", "unit": "count", "kind": "gauge", "source": "artifact", "required": false},
+    {"name": "particle_cell_count", "unit": "count", "kind": "timeseries", "source": "artifact", "required": true},
+    {"name": "checkpoint_freshness", "unit": "s", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "load_balance_warnings", "unit": "count", "kind": "event", "source": "log", "required": false}
+  ],
+  "panels": [{"id": "evolution", "title": "Astro Evolution", "metric_names": ["simulation_time", "redshift", "conserved_quantity_drift", "particle_cell_count", "checkpoint_freshness"]}],
+  "red_flags": [{"id": "checkpoint_or_conservation_failure", "severity": "stop", "condition": "checkpoint cadence stalls or conserved quantity drift exceeds run threshold", "recommended_action": "preserve checkpoint/logs and review timestep hierarchy, domain decomposition, and units"}],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["license_server", "module_path"]}
+}

@@ -1,0 +1,23 @@
+"""OpenMC handoff model stub.
+
+Review and fill materials, geometry, source, and cross-section path in an
+authorized environment before execution. This file is intentionally not a
+scientific result.
+"""
+
+import openmc
+
+materials = openmc.Materials()
+
+geometry = openmc.Geometry()
+
+settings = openmc.Settings()
+settings.batches = 20
+settings.inactive = 5
+settings.particles = 1000
+settings.seed = 12345
+
+tallies = openmc.Tallies()
+
+model = openmc.Model(geometry=geometry, materials=materials, settings=settings, tallies=tallies)
+model.export_to_xml()

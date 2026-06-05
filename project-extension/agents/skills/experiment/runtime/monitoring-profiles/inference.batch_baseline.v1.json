@@ -1,0 +1,27 @@
+{
+  "profile_id": "inference.batch_baseline.v1",
+  "domain": "inference",
+  "family": "batch_serving",
+  "expected_duration_class": "medium",
+  "heartbeat": {"min_threshold_seconds": 60, "cadence_seconds": 180, "max_gap_seconds": 1200},
+  "metrics": [
+    {"name": "request_count", "unit": "count", "kind": "timeseries", "source": "gateway", "required": true},
+    {"name": "tokens_per_second", "unit": "tokens/s", "kind": "timeseries", "source": "gateway", "required": false},
+    {"name": "queue_depth", "unit": "count", "kind": "timeseries", "source": "gateway", "required": false},
+    {"name": "p95_latency_ms", "unit": "ms", "kind": "timeseries", "source": "gateway", "required": false},
+    {"name": "error_rate", "unit": "percent", "kind": "timeseries", "source": "gateway", "required": true},
+    {"name": "output_freshness", "unit": "s", "kind": "gauge", "source": "artifact", "required": true},
+    {"name": "oom_events", "unit": "count", "kind": "event", "source": "log", "required": true}
+  ],
+  "panels": [
+    {"id": "throughput", "title": "Throughput", "metric_names": ["request_count", "tokens_per_second", "queue_depth", "p95_latency_ms", "error_rate"]},
+    {"id": "runtime_health", "title": "Runtime health", "metric_names": ["output_freshness", "oom_events"]}
+  ],
+  "red_flags": [
+    {"id": "error_rate_spike", "severity": "warn", "condition": "error rate spikes or latency stalls without request progress", "recommended_action": "inspect the serving stack, reduce traffic, and increase heartbeat cadence until the endpoint stabilizes"},
+    {"id": "oom_loop", "severity": "stop", "condition": "repeated OOM events or queue growth shows the endpoint cannot serve the configured batch safely", "recommended_action": "preserve logs, stop if safe, and relaunch with a smaller batch or larger GPU after budget review"}
+  ],
+  "stop_policy": {"default_action": "warn", "requires_budget_recheck_for_relaunch": true},
+  "safe_to_auto_stop": false,
+  "redaction": {"apply_common_redaction": true, "sensitive_fields": ["artifact_path", "provider_metadata", "private_endpoint", "bearer_token"]}
+}

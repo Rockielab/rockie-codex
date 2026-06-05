@@ -1,0 +1,107 @@
+# figure-gen.py.tmpl — the single versioned figure script (TEMPLATE)
+#
+# This is a TEMPLATE, not a runnable program. The figure agent fills in the
+# `<...>` placeholders, points DATA_SOURCES at the lab's real evidence, and runs the
+# filled-in script ON ROCKIE COMPUTE (the /experiment path,
+# POST $ROCKIELAB_API_URL/api/jobs/submit), NOT on the orchestrator host. This
+# skill never executes or imports this file.
+#
+# Why one script for every figure:
+#   - Reproducibility: a reviewer traces each panel to the code that made it.
+#   - Consistency: shared style (fonts, sizes, palette) across every figure.
+#   - Versioning: one file in the bundle, versioned with the paper.
+#
+# Caption discipline lives in references/styleguide.md: every caption is
+# self-contained. Captions are written in the LaTeX/section files, not here, but
+# each figure function below names the takeaway it must support.
+
+"""Generate every figure for <paper short title> from one script.
+
+Usage (on Rockie compute):
+    python figure-gen.py --out figures/ --data <data dir>
+
+Each figure is a function; main() runs them all and writes <name>.pdf to --out.
+"""
+
+import argparse
+
+# Fill in: the real evidence sources, by path + identifier, matching the brief's
+# claims-to-evidence map. Do NOT hard-code numbers here that are not in the
+# evidence; load them from the source so the figure cannot drift from the data.
+DATA_SOURCES = {
+    # "rank_curves": "<path to the rank-k eval JSONs / results table>",
+    # "probe_auc":   "<path to the linear-probe results>",
+    # "scale_sweep": "<path to the scale-sweep SUMMARY files>",
+}
+
+# Shared style — set once so every figure matches.
+STYLE = {
+    "font_size": 9,          # legible at two-column target size
+    "fig_width_in": 3.3,     # single-column width; use 6.8 for full-width
+    "dpi": 300,
+    "palette": ["#000000", "#8B2E1F", "#666666", "#B0B0B0"],  # print-safe
+}
+
+
+def _load(source_key):
+    """Load one evidence source named in DATA_SOURCES. Fill in the real loader."""
+    path = DATA_SOURCES[source_key]
+    raise NotImplementedError(
+        f"Fill in the loader for {source_key!r} ({path}) — read the real "
+        f"evidence so the figure traces to the data."
+    )
+
+
+def fig_rank_curves(out_dir):
+    """fig1: <takeaway, e.g. N flat rank-k curves across training regimes>.
+
+    Self-contained caption (write in the section .tex): name the task, the
+    ablation (rank-k projection), and the takeaway (curves flat to <= X pp).
+    """
+    # data = _load("rank_curves")
+    # ... plot one line per regime; x = k in {1,2,4,8,16}; y = accuracy ...
+    # ... save out_dir / "fig1_rank_curves.pdf" ...
+    raise NotImplementedError("Fill in fig_rank_curves from the real evidence.")
+
+
+def fig_probe_auc(out_dir):
+    """fig2: <takeaway, e.g. bottleneck AUC vs raw hidden-state AUC>.
+
+    Caption must state both feature dims so the comparison is honest (the
+    gauntlet flagged a capacity confound when the dims were not matched).
+    """
+    # data = _load("probe_auc")
+    raise NotImplementedError("Fill in fig_probe_auc from the real evidence.")
+
+
+def fig_scale_sweep(out_dir):
+    """fig3: <takeaway, e.g. matrix vs vanilla across backbone scales>.
+
+    Caption must mark any pending/OOM'd point explicitly; do NOT omit it
+    silently and do NOT fabricate it.
+    """
+    # data = _load("scale_sweep")
+    raise NotImplementedError("Fill in fig_scale_sweep from the real evidence.")
+
+
+# Add one function per figure in the brief's "Figures to generate" list.
+
+FIGURES = [
+    fig_rank_curves,
+    fig_probe_auc,
+    fig_scale_sweep,
+    # <...>
+]
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate all paper figures.")
+    parser.add_argument("--out", default="figures/", help="output directory")
+    parser.add_argument("--data", default=".", help="evidence data directory")
+    args = parser.parse_args()
+    for make_fig in FIGURES:
+        make_fig(args.out)
+
+
+if __name__ == "__main__":
+    main()

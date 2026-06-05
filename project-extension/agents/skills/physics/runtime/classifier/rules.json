@@ -1,0 +1,54 @@
+{
+  "families": [
+    {
+      "family": "force_fields",
+      "profile_id": "physics.force_fields.v1",
+      "keywords": ["force field", "missing parameter", "charge assignment", "water model", "ion parameters", "mixing rules", "unusual residue", "surface parameter", "metal potential"]
+    },
+    {
+      "family": "molecular_dynamics",
+      "profile_id": "physics.molecular_dynamics.v1",
+      "keywords": ["molecular dynamics", "md", "trajectory", "thermostat", "barostat", "lammps", "gromacs", "openmm", "enhanced sampling", "nvt", "nve"]
+    },
+    {
+      "family": "electronic_structure",
+      "profile_id": "physics.electronic_structure.v1",
+      "keywords": ["dft", "scf", "band structure", "orbital", "phonon", "quantum espresso", "cp2k", "vasp", "gaussian", "geometry optimization", "total energy"]
+    },
+    {
+      "family": "particle_transport_collision",
+      "profile_id": "physics.particle_transport_collision.v1",
+      "keywords": ["pythia", "madgraph", "geant4", "root", "detector", "collision", "event generation", "cross section", "event file"]
+    },
+    {
+      "family": "continuum_multiphysics",
+      "profile_id": "physics.continuum_multiphysics.v1",
+      "keywords": ["cfd", "fea", "openfoam", "su2", "moose", "calculix", "mesh", "residual", "cfl", "stress", "heat transfer", "boundary condition"]
+    },
+    {
+      "family": "plasma_pic",
+      "profile_id": "physics.plasma_pic.v1",
+      "keywords": ["plasma", "pic", "warpx", "smilei", "picongpu", "gkeyll", "openpmd", "courant", "particles per cell"]
+    },
+    {
+      "family": "nuclear_radiation",
+      "profile_id": "physics.nuclear_radiation.v1",
+      "keywords": ["openmc", "mcnp", "neutron", "photon transport", "shielding", "reactor", "tally", "depletion", "cross-section library", "shannon entropy"]
+    },
+    {
+      "family": "astro_cosmology",
+      "profile_id": "physics.astro_cosmology.v1",
+      "keywords": ["cosmology", "n-body", "athena++", "gadget", "enzo", "redshift", "galaxy", "mhd", "checkpoint", "load balance"]
+    },
+    {
+      "family": "literature_only",
+      "profile_id": null,
+      "keywords": ["literature review", "compare papers", "survey papers", "summarize methods", "no simulation"]
+    }
+  ],
+  "tie_breakers": [
+    {"if_contains": ["neutron", "tally"], "prefer": "nuclear_radiation"},
+    {"if_contains": ["force field", "trajectory"], "prefer": "molecular_dynamics"},
+    {"if_contains": ["detector", "geant4"], "prefer": "particle_transport_collision"}
+  ]
+}
