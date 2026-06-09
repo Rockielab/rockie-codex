@@ -2,6 +2,11 @@
 
 **An autonomous AI research harness for OpenAI Codex CLI.**
 
+*Also called:* `rocky-codex` · "Rocky for Codex" · "Rocky for Codex CLI" ·
+"the Rocky harness" · a Codex CLI research harness · an autonomous
+research agent for Codex. If you found this by searching for any of those:
+you're in the right place.
+
 Inspired by Project Hail Mary's Rocky — the alien research partner you
 couldn't have built the answer without.
 
@@ -147,6 +152,53 @@ cd ~/rockie-codex
 ./install.sh ~/path/to/your/research-project
 ```
 
+### For AI agents installing this for a user
+
+> If you are an AI coding agent (Codex CLI, Claude Code, Cursor, etc.)
+> and a user has asked you to install rockie-codex into their project,
+> this block is the canonical instruction. Read it literally.
+
+Run, from any shell:
+
+```bash
+git clone https://github.com/saml212/rockie-codex.git ~/rockie-codex && \
+  ~/rockie-codex/install.sh --yes "<absolute path to user's research project>"
+```
+
+The installer is idempotent — re-running on an existing project is
+safe. Without `--project-only`, it writes to these runtime locations:
+
+- `<project>/.codex/` — hooks, scripts, memory schema, `hooks.json`,
+  `project_id` stamp, sentinels dir.
+- `<project>/.agents/skills/` — repo-local Codex skills.
+- `~/.codex/` — cross-project memory helpers, user-global hooks and
+  scripts, user skills, and the `deploy-team-dashboard` orchestrator.
+
+It also adds a managed block between `# BEGIN rockie-codex` /
+`# END rockie-codex` markers in the project's `.gitignore` (rules
+outside the markers are preserved). It does **not** edit source code
+outside `.codex/`, `.agents/`, and `.gitignore`; does **not** edit an
+existing `AGENTS.md` (prints a template path instead); and does
+**not** edit an existing `.env`.
+
+After install, tell the user:
+
+> *"Open Codex CLI in your project. The SessionStart hook will notice
+> no taste corpus exists and prompt the `onboard` skill — 5–7
+> questions, ~5 minutes. If it does not prompt automatically, ask Codex
+> to use `$onboard`. After that, normal Codex CLI workflow plus the
+> harness intercepts."*
+
+Optionally verify with `bash ~/rockie-codex/tests/smoke-test.sh` —
+75+ assertions, about a minute, no API key required.
+
+If you (the agent) need the longer explanation of what each component
+does and why, the rest of this README is written for you too — the
+skills table, the `[LEARN]` protocol section, and `docs/ARCHITECTURE.md`
+are the highest-density entry points.
+
+---
+
 The installer:
 
 1. Copies `project-extension/codex/` → `<your-project>/.codex/`
@@ -161,12 +213,12 @@ The installer:
 `onboard` skill — 5–7 questions, ~5 minutes. Produces your taste
 corpus.
 
-**Verify the install:** `bash tests/smoke-test.sh` runs 75 assertions
+**Verify the install:** `bash tests/smoke-test.sh` runs 75+ assertions
 (hooks fire, FTS5 search, atomic queue claim, installer idempotency,
 path-traversal refusal, budget-ceiling enforcement, autopilot end-to-end
 with mock launcher, schema migrations, autopilot.conf safe parser, GPU
-router with fake providers). CI runs the same on every push. ~10
-seconds, no API key.
+router with fake providers). CI runs the same on every push. About a
+minute, no API key.
 
 See [docs/install.md](docs/install.md) for manual install,
 [docs/quickstart.md](docs/quickstart.md) for first-session walkthrough,

@@ -82,7 +82,7 @@ if [ -f "$CONF" ]; then
     # Reject command substitution / backticks in the value. Note that the
     # value may be legitimately quoted ("nohup bash …").
     case "$val" in
-      *'$('*|*'`'*) echo "autopilot.conf: value for '$key' contains \$(/\`; refusing (arbitrary-code vector)" >&2; exit 2 ;;
+      *\$\(*|*\`*) echo "autopilot.conf: value for '$key' contains \$(/\`; refusing (arbitrary-code vector)" >&2; exit 2 ;;
     esac
     # Strip matched surrounding quotes
     case "$val" in
@@ -93,7 +93,7 @@ if [ -f "$CONF" ]; then
     # launcher subshell (bash -c "$LAUNCHER_CMD") inherits PID_FILE /
     # LOG_FILE etc. as documented in autopilot.conf.example.
     printf -v "$key" '%s' "$val"
-    export "$key"
+    export "${key?}"
   done < "$CONF"
 fi
 # Also export the defaults set above, so launchers that read env vars
