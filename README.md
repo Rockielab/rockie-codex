@@ -190,7 +190,7 @@ After install, tell the user:
 > harness intercepts."*
 
 Optionally verify with `bash ~/rockie-codex/tests/smoke-test.sh` —
-75+ assertions, ~10 seconds, no API key required.
+75+ assertions, about a minute, no API key required.
 
 If you (the agent) need the longer explanation of what each component
 does and why, the rest of this README is written for you too — the
@@ -217,8 +217,8 @@ corpus.
 (hooks fire, FTS5 search, atomic queue claim, installer idempotency,
 path-traversal refusal, budget-ceiling enforcement, autopilot end-to-end
 with mock launcher, schema migrations, autopilot.conf safe parser, GPU
-router with fake providers). CI runs the same on every push. ~10
-seconds, no API key.
+router with fake providers). CI runs the same on every push. About a
+minute, no API key.
 
 See [docs/install.md](docs/install.md) for manual install,
 [docs/quickstart.md](docs/quickstart.md) for first-session walkthrough,

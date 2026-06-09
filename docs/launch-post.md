@@ -98,7 +98,7 @@ is used). It adds a managed `# BEGIN rockie-codex` / `# END
 rockie-codex` block to `.gitignore`. It never edits source code
 outside `.codex/`, `.agents/`, and `.gitignore`, never edits an
 existing `AGENTS.md`, and never edits an existing `.env`. Verify with
-`bash tests/smoke-test.sh` — 75+ assertions, ~10 seconds, no API key.
+`bash tests/smoke-test.sh` — 75+ assertions, about a minute, no API key.
 
 **Claude Code sibling:**
 [`saml212/rockie-claude`](https://github.com/saml212/rockie-claude).
