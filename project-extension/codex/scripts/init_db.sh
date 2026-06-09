@@ -34,7 +34,7 @@ fi
 
 # Apply numbered migrations in order, bumping user_version after each.
 if [ -d "$MIGRATIONS" ]; then
-  for f in $(ls "$MIGRATIONS"/*.sql 2>/dev/null | sort); do
+  while IFS= read -r f; do
     base=$(basename "$f")
     n="${base%%_*}"
     n=$((10#$n))                # strip leading zeros safely (avoid octal)
@@ -44,7 +44,7 @@ if [ -d "$MIGRATIONS" ]; then
       "$SQLITE" "$DB" "PRAGMA user_version = $n;"
       CUR="$n"
     fi
-  done
+  done < <(find "$MIGRATIONS" -maxdepth 1 -type f -name '*.sql' -print | sort)
 fi
 
 echo "db initialized: $DB"

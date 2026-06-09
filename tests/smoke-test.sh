@@ -557,7 +557,7 @@ if [ -f "$EVENTS" ] && grep -q '"kind":"claimed"' "$EVENTS" && grep -q '"kind":"
   ok "autopilot loop: claim → launcher-fires → ZCM cycle completes one iteration"
 else
   fail "autopilot loop: events.jsonl missing expected kinds"
-  [ -f "$EVENTS" ] && cat "$EVENTS" | tail -5
+  [ -f "$EVENTS" ] && tail -5 "$EVENTS"
 fi
 rm -rf "$AP"
 
