@@ -36,6 +36,16 @@ def test_modify_below_estimate_requires_requote():
     assert result["decision"] == "modify"
     assert result["budget_cents"] == 15000
     assert result["requires_requote"] is True
+    assert result["approved_for_submit"] is False
+
+
+def test_modify_then_approve_below_estimate_requires_non_submittable_requote():
+    mod = _load_module()
+    result = mod.parse_reply("cap it at $150 and approved", estimate_cents=20000)
+    assert result["decision"] == "modify_then_approve"
+    assert result["budget_cents"] == 15000
+    assert result["requires_requote"] is True
+    assert result["approved_for_submit"] is False
 
 
 def test_negative_reply_cancels():

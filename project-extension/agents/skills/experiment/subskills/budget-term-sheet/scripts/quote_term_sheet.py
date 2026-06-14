@@ -38,6 +38,7 @@ STAGE_WEIGHTS = (
     ("artifact_storage", 3),
 )
 ROCKIE_RUNTIME_USER_AGENT = "rockie-runtime/1.0 (+https://api.rockielab.com)"
+TRUSTED_ROCKIE_API_HOST = "api.rockielab.com"
 
 
 class QuoteError(RuntimeError):
@@ -171,6 +172,7 @@ def _select_quote_source(
 
     resolved_api = (api_url or os.environ.get("ROCKIELAB_API_URL", "")).rstrip("/")
     if resolved_api and os.environ.get("ROCKIELAB_TENANT_TOKEN") and os.environ.get("ROCKIELAB_TENANT_ID"):
+        _validate_trusted_rockie_api_url(resolved_api)
         market_response = _get_market_response(resolved_api, job_spec, duration_hours)
         if market_response.status == 200:
             return market_response, "market"
@@ -199,6 +201,15 @@ def _select_quote_source(
     )
 
 
+def _validate_trusted_rockie_api_url(api_url: str) -> None:
+    parsed = urllib.parse.urlparse(api_url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme.lower() != "https":
+        raise QuoteError("Rockie API URL must use https before tenant auth is attached.")
+    if host != TRUSTED_ROCKIE_API_HOST and not host.endswith(f".{TRUSTED_ROCKIE_API_HOST}"):
+        raise QuoteError("Rockie API URL host is not trusted for tenant auth.")
+
+
 def _get_market_response(api_url: str, job_spec: dict[str, Any], duration_hours: float) -> Response:
     query = {
         "gpu_type": job_spec["gpu_type"],
@@ -218,6 +229,7 @@ def _get_prices_response(api_url: str) -> Response:
 
 
 def _http_json(url: str) -> Response:
+    _validate_trusted_rockie_api_url(url)
     headers = {
         "Accept": "application/json",
         "User-Agent": ROCKIE_RUNTIME_USER_AGENT,

@@ -129,6 +129,7 @@ def parse_reply(reply: str, *, estimate_cents: Optional[int] = None) -> dict[str
         )
         if estimate_cents is not None and budget_cents < estimate_cents:
             result["requires_requote"] = True
+            result["approved_for_submit"] = False
             result["reason"] = (
                 "Modified budget is below the estimate; re-render a non-submittable term sheet "
                 "and ask for a budget at or above the estimate or a cancel."

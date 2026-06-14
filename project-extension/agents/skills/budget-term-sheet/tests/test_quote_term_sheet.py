@@ -225,12 +225,66 @@ def test_live_quote_requests_identify_rockie_runtime(monkeypatch):
     monkeypatch.setenv("ROCKIELAB_TENANT_TOKEN", "service-token")
     monkeypatch.setenv("ROCKIELAB_TENANT_ID", "t-aaaaaaaaaaaa")
     with mock.patch.object(mod.urllib.request, "urlopen", fake_urlopen):
-        response = mod._http_json("https://api.rockielab.test/api/gpu/market")
+        response = mod._http_json("https://api.rockielab.com/api/gpu/market")
 
     assert response.status == 200
     assert captured["timeout"] == 30
     assert captured["headers"]["User-agent"].startswith("rockie-runtime/")
     assert "Python-urllib" not in captured["headers"]["User-agent"]
+    assert captured["headers"]["X-tenant-token"] == "service-token"
+    assert captured["headers"]["X-tenant-id"] == "t-aaaaaaaaaaaa"
+
+
+def test_live_quote_rejects_non_https_before_tenant_auth(monkeypatch):
+    mod = _load_module()
+
+    def fake_urlopen(req, timeout):
+        raise AssertionError("urlopen must not be called for untrusted api_url")
+
+    monkeypatch.setenv("ROCKIELAB_TENANT_TOKEN", "service-token")
+    monkeypatch.setenv("ROCKIELAB_TENANT_ID", "t-aaaaaaaaaaaa")
+    with mock.patch.object(mod.urllib.request, "urlopen", fake_urlopen):
+        try:
+            mod.build_quote(
+                {
+                    "job_shape": "eval_only",
+                    "gpu_type": "A100_80GB",
+                    "gpu_count": 1,
+                },
+                market_json_path=None,
+                api_url="http://api.rockielab.com",
+                allow_heuristic_dry_run=False,
+            )
+        except mod.QuoteError as exc:
+            assert "must use https" in str(exc)
+        else:
+            raise AssertionError("expected QuoteError")
+
+
+def test_live_quote_rejects_non_rockie_host_before_tenant_auth(monkeypatch):
+    mod = _load_module()
+
+    def fake_urlopen(req, timeout):
+        raise AssertionError("urlopen must not be called for untrusted api_url")
+
+    monkeypatch.setenv("ROCKIELAB_TENANT_TOKEN", "service-token")
+    monkeypatch.setenv("ROCKIELAB_TENANT_ID", "t-aaaaaaaaaaaa")
+    with mock.patch.object(mod.urllib.request, "urlopen", fake_urlopen):
+        try:
+            mod.build_quote(
+                {
+                    "job_shape": "eval_only",
+                    "gpu_type": "A100_80GB",
+                    "gpu_count": 1,
+                },
+                market_json_path=None,
+                api_url="https://example.invalid",
+                allow_heuristic_dry_run=False,
+            )
+        except mod.QuoteError as exc:
+            assert "host is not trusted" in str(exc)
+        else:
+            raise AssertionError("expected QuoteError")
 
 
 def _fixture(name: str) -> Path:
