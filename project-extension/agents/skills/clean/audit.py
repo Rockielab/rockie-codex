@@ -97,9 +97,9 @@ def audit_shell(f):
 def audit_markdown(f, is_new, repo_root):
     issues = []
     # Block creation of new .md files — user's rule for this repo.
-    # Exempt: harness infrastructure (.codex/** legacy or .openclaw/**)
+    # Exempt: harness infrastructure (.claude/** legacy or .openclaw/**)
     # where .md files are skill/agent definitions required to exist.
-    if is_new and not (f.startswith(".codex/") or f.startswith(".openclaw/")):
+    if is_new and not (f.startswith(".claude/") or f.startswith(".openclaw/")):
         issues.append((
             f, "blocker",
             "NEW .md file. Repo convention: consolidate into existing docs. "
