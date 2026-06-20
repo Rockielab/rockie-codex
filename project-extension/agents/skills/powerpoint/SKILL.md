@@ -1,6 +1,31 @@
 ---
 name: powerpoint
 description: Create validated PowerPoint `.pptx` deck artifacts through the lean Rockie PPTAgent wrapper and emit them to the lab.
+scope: community
+attribution:
+  schema_version: 1
+  authors:
+    - rockie_username: "elias-ward"
+      display_name: "Elias Ward"
+      profile_refs: ["platform-skills:elias-ward"]
+  maintainers:
+    - rockie_username: "elias-ward"
+      display_name: "Elias Ward"
+      profile_refs: ["platform-skills:elias-ward"]
+  profiles:
+    platform-skills:elias-ward:
+      provider: "platform-skills"
+      url: "https://github.com/Rockielab/platform-skills/tree/main/skills/powerpoint"
+      verified: false
+  source:
+    repo: "Rockielab/platform-skills"
+    path: "skills/powerpoint/SKILL.md"
+    version: "2026-03-22"
+    url: "https://github.com/Rockielab/platform-skills/tree/main/skills/powerpoint"
+  contact_policy:
+    maintainer_contact: "profile_public_only"
+    contribution_channel: "product_proposals"
+  completeness: "complete"
 ---
 
 # powerpoint

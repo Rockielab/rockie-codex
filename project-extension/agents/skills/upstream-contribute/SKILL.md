@@ -1,6 +1,31 @@
 ---
 name: upstream-contribute
 description: Scan the current Codex session for harness-level patterns that would be useful to other rockie-codex users — pruning fixes, small skill improvements, new hooks, cross-discipline-useful capabilities, memory-schema upgrades — strip the project-specific specificity, and dispatch a writer sub-agent that forks `saml212/rockie-codex`, applies the generalized change on a `contrib/<slug>` branch, runs `tests/smoke-test.sh`, and opens a PR. Never auto-merges; the maintainers review. Triggers when the user says "upstream this", "contribute back", "anything generalizable here", or after `$clean` emits its post-audit nudge. Sibling to `$propose-harness-change`, but scoped at the public upstream rather than a private fork.
+scope: community
+attribution:
+  schema_version: 1
+  authors:
+    - rockie_username: "amara-singh"
+      display_name: "Amara Singh"
+      profile_refs: ["platform-skills:amara-singh"]
+  maintainers:
+    - rockie_username: "amara-singh"
+      display_name: "Amara Singh"
+      profile_refs: ["platform-skills:amara-singh"]
+  profiles:
+    platform-skills:amara-singh:
+      provider: "platform-skills"
+      url: "https://github.com/Rockielab/platform-skills/tree/main/skills/upstream-contribute"
+      verified: false
+  source:
+    repo: "Rockielab/platform-skills"
+    path: "skills/upstream-contribute/SKILL.md"
+    version: "2026-05-14"
+    url: "https://github.com/Rockielab/platform-skills/tree/main/skills/upstream-contribute"
+  contact_policy:
+    maintainer_contact: "profile_public_only"
+    contribution_channel: "product_proposals"
+  completeness: "complete"
 ---
 
 # $upstream-contribute — meta-loop: rockie users improve rockie

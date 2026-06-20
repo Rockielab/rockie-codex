@@ -1,6 +1,31 @@
 ---
 name: build-agent
 description: Lab composer command scaffold for `/build-agent <name>`. In Agent Builder A1 this only creates a lab-scoped draft agent record and opens that lab's agent detail route for editing. It does not build, run, evaluate, observe, or deploy agents yet.
+scope: community
+attribution:
+  schema_version: 1
+  authors:
+    - rockie_username: "theo-ramirez"
+      display_name: "Theo Ramirez"
+      profile_refs: ["platform-skills:theo-ramirez"]
+  maintainers:
+    - rockie_username: "theo-ramirez"
+      display_name: "Theo Ramirez"
+      profile_refs: ["platform-skills:theo-ramirez"]
+  profiles:
+    platform-skills:theo-ramirez:
+      provider: "platform-skills"
+      url: "https://github.com/Rockielab/platform-skills/tree/main/skills/build-agent"
+      verified: false
+  source:
+    repo: "Rockielab/platform-skills"
+    path: "skills/build-agent/SKILL.md"
+    version: "2026-04-17"
+    url: "https://github.com/Rockielab/platform-skills/tree/main/skills/build-agent"
+  contact_policy:
+    maintainer_contact: "profile_public_only"
+    contribution_channel: "product_proposals"
+  completeness: "complete"
 ---
 
 # build-agent - lab-scoped draft agent bootstrap
