@@ -54,6 +54,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from monitor_contract import normalize_monitor_envelope
 from monitoring_profiles import infer_software, resolve_profile_snapshot
 
 
@@ -554,6 +555,85 @@ def finalize_dashboard(
         return None
 
 
+# Result sentinels for the hardened training-progress emission. "posted" means
+# the server resolved the job's own note and forwarded {step,loss}; "unavailable"
+# means an older backend lacks the route (fall back to the generic dashboard
+# append, which still carries the metrics); "failed" means the route exists but
+# the write errored (also falls back so training never hard-breaks).
+TRAINING_PROGRESS_POSTED = "posted"
+TRAINING_PROGRESS_UNAVAILABLE = "unavailable"
+TRAINING_PROGRESS_FAILED = "failed"
+
+# A job submits its OWN progress, so the job is always present and same-tenant.
+# Therefore a 404/405/501 from this route means the backend predates it — not a
+# real missing/cross-tenant job — so we degrade to the legacy append path.
+_TRAINING_PROGRESS_ROUTE_ABSENT_CODES = frozenset({404, 405, 501})
+
+
+def append_training_progress(
+    job_id: str,
+    *,
+    step: Optional[float] = None,
+    loss: Optional[float] = None,
+    api_url: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+) -> str:
+    """Forward a {step,loss} sample to the hardened, server-resolved endpoint.
+
+    ``POST /api/jobs/{job_id}/training-progress`` resolves the job's OWN
+    dashboard note server-side (tenant-scoped) and normalizes to canonical
+    ``training.step`` / ``training.loss`` signals, so the runtime no longer
+    supplies a note id. Returns one of ``TRAINING_PROGRESS_POSTED`` /
+    ``TRAINING_PROGRESS_UNAVAILABLE`` / ``TRAINING_PROGRESS_FAILED``.
+
+    The endpoint requires at least one of step/loss; an all-``None`` sample is
+    reported unavailable so the caller skips it without a wasted request.
+    """
+    payload: dict[str, Any] = {}
+    if step is not None:
+        payload["step"] = step
+    if loss is not None:
+        payload["loss"] = loss
+    if not payload:
+        return TRAINING_PROGRESS_UNAVAILABLE
+    try:
+        api = (api_url or _api_url()).rstrip("/")
+        code, body = _dashboard_http_request(
+            "POST",
+            f"{api}/api/jobs/{urllib.parse.quote(job_id, safe='')}/training-progress",
+            headers=_headers(tenant_id),
+            body=json.dumps(payload).encode("utf-8"),
+        )
+        if code in _TRAINING_PROGRESS_ROUTE_ABSENT_CODES:
+            return TRAINING_PROGRESS_UNAVAILABLE
+        parsed = _decode_json(body)
+        if code == 0 or code >= 400:
+            _warn_dashboard_failure("training-progress", code, parsed)
+            return TRAINING_PROGRESS_FAILED
+        return TRAINING_PROGRESS_POSTED
+    except Exception as exc:
+        _warn_dashboard_failure(
+            "training-progress", 0, {"error": f"training_progress_error: {exc}"}
+        )
+        return TRAINING_PROGRESS_FAILED
+
+
+def _finetune_progress_sample(log_line: Optional[str]) -> Optional[dict[str, float]]:
+    """Extract a {step?, loss?} sample from a FINETUNE_PROGRESS log line.
+
+    Returns ``None`` when the line carries no usable finite step/loss — the
+    canonical-name mapping lives in :func:`_finetune_progress_metrics`; this is
+    the payload shape the hardened endpoint expects.
+    """
+    sample: dict[str, float] = {}
+    for metric in _finetune_progress_metrics(log_line):
+        if metric["name"] == "training.step":
+            sample["step"] = metric["value"]
+        elif metric["name"] == "training.loss":
+            sample["loss"] = metric["value"]
+    return sample or None
+
+
 def _dashboard_writer(job_id: str) -> dict[str, str]:
     return {"job_backend": "gpu_job", "job_id": job_id}
 
@@ -585,9 +665,16 @@ def _dashboard_error_body(error: str) -> bytes:
 
 
 def _dashboard_status_patch(job: dict[str, Any], *, final: bool = False) -> dict[str, Any]:
+    monitor = normalize_monitor_envelope(job)
     patch: dict[str, Any] = {
         "job_state": job.get("state"),
         "log_state": "available" if job.get("last_log_line") else "unavailable",
+        "monitor_owner": monitor["monitor_owner"],
+        "monitor_target": monitor["monitor_target"],
+        "state": monitor["state"],
+        "utilization": monitor["utilization"],
+        "spend": monitor["spend"],
+        "artifacts": monitor["artifacts"],
     }
     for key in ("cost_actual_cents", "cost_so_far_cents"):
         if job.get(key) is not None:
@@ -692,11 +779,12 @@ def _dashboard_events(
 
 
 def _unavailable_telemetry_metrics() -> list[dict[str, Any]]:
+    monitor = normalize_monitor_envelope({})
     return [
         {
             "name": "gpu_utilization",
-            "state": "unavailable",
-            "reason_code": "telemetry_not_exposed",
+            "state": monitor["utilization"]["state"],
+            "reason_code": monitor["utilization"]["reason_code"],
             "summary": "GPU utilization telemetry is unavailable from the job status API.",
         }
     ]
@@ -885,7 +973,23 @@ def poll(
                 if include_heartbeat:
                     metrics.extend(_unavailable_telemetry_metrics())
                 if log_changed:
-                    metrics.extend(_finetune_progress_metrics(log_line))
+                    # Hardened path first: let the backend resolve the job's own
+                    # note and normalize {step,loss}. Only fall back to carrying
+                    # the metrics on the generic append when the route is absent
+                    # (older backend) or the write failed — never hard-break.
+                    sample = _finetune_progress_sample(log_line)
+                    posted = False
+                    if sample is not None:
+                        result = append_training_progress(
+                            job_id,
+                            step=sample.get("step"),
+                            loss=sample.get("loss"),
+                            api_url=api_url,
+                            tenant_id=tenant_id,
+                        )
+                        posted = result == TRAINING_PROGRESS_POSTED
+                    if not posted:
+                        metrics.extend(_finetune_progress_metrics(log_line))
                 append_response = append_dashboard(
                     dashboard_note_id,
                     job_id=job_id,

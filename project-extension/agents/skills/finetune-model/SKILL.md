@@ -137,6 +137,25 @@ progress line is printed to stdout. Malformed progress lines are ignored safely.
 
 ## Artifact handoff and deployment
 
+The runtime helper `skills/finetune-model/runtime/deploy.py` executes this
+contract end to end. Once the fine-tune job is `DONE`, run:
+
+```bash
+python skills/finetune-model/runtime/deploy.py \
+  --job-id <job_id> \
+  --note-id <dashboard note id from submit's response> \
+  --model <model slug>
+```
+
+It fetches artifacts, deploys `results/fine-tuned-model.tar.gz` through the
+inference loader via the `rockie-job-artifact://` scheme url, waits for the
+endpoint, emits the endpoint + token + curl payoff to the lab surface as an
+`artifact` event, and prints that block to stdout. It **fails closed with no
+spend** (exit code 5, the loader is never called) when the trained artifact is
+absent, and it surfaces a platform 402 verbatim rather than swallowing it.
+
+The steps below document the same contract for reference.
+
 After the job reaches `DONE`, fetch artifacts:
 
 ```bash

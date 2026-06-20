@@ -1,6 +1,31 @@
 ---
 name: excel
 description: Create validated Excel `.xlsx` workbook artifacts with XlsxWriter, formula-injection protection, and Rockie artifact emission.
+scope: community
+attribution:
+  schema_version: 1
+  authors:
+    - rockie_username: "priya-nair"
+      display_name: "Priya Nair"
+      profile_refs: ["platform-skills:priya-nair"]
+  maintainers:
+    - rockie_username: "priya-nair"
+      display_name: "Priya Nair"
+      profile_refs: ["platform-skills:priya-nair"]
+  profiles:
+    platform-skills:priya-nair:
+      provider: "platform-skills"
+      url: "https://github.com/Rockielab/platform-skills/tree/main/skills/excel"
+      verified: false
+  source:
+    repo: "Rockielab/platform-skills"
+    path: "skills/excel/SKILL.md"
+    version: "2026-03-18"
+    url: "https://github.com/Rockielab/platform-skills/tree/main/skills/excel"
+  contact_policy:
+    maintainer_contact: "profile_public_only"
+    contribution_channel: "product_proposals"
+  completeness: "complete"
 ---
 
 # excel

@@ -1,6 +1,31 @@
 ---
 name: physics
 description: Route physics simulation, modeling, validation, and research-compute requests across force fields, molecular dynamics, electronic structure, particle transport/collision, continuum multiphysics, plasma/PIC, nuclear/radiation, and astro/cosmology. Use open-source-first engines, refuse local heavyweight execution on the orchestrator, and attach physics dashboard monitoring profiles to run plans.
+scope: community
+attribution:
+  schema_version: 1
+  authors:
+    - rockie_username: "nikhil-rao"
+      display_name: "Nikhil Rao"
+      profile_refs: ["platform-skills:nikhil-rao"]
+  maintainers:
+    - rockie_username: "nikhil-rao"
+      display_name: "Nikhil Rao"
+      profile_refs: ["platform-skills:nikhil-rao"]
+  profiles:
+    platform-skills:nikhil-rao:
+      provider: "platform-skills"
+      url: "https://github.com/Rockielab/platform-skills/tree/main/skills/physics"
+      verified: false
+  source:
+    repo: "Rockielab/platform-skills"
+    path: "skills/physics/SKILL.md"
+    version: "2026-05-28"
+    url: "https://github.com/Rockielab/platform-skills/tree/main/skills/physics"
+  contact_policy:
+    maintainer_contact: "profile_public_only"
+    contribution_channel: "product_proposals"
+  completeness: "complete"
 ---
 
 # Physics Research Router
@@ -10,6 +35,10 @@ calculation, modeling, validation, input-deck generation, run monitoring,
 or result interpretation. Current skill discovery is top-level only, so
 the domain modules are routed references under `references/` rather than
 nested discoverable skills.
+
+Physics is a router by default, not a direct provisioner. If a user asks
+for direct monitor status without a bound underlying run owner, return
+`router_not_provisioner`. Executed-run monitoring belongs to the owning provisioner parent skill such as `experiment` or `inference-engineer`, not the physics router itself.
 
 ## First Steps
 
@@ -92,6 +121,13 @@ notes:
 Prefer credible open-source engines. Run cheap smoke tests before full
 runs. Full runs require explicit compute mode, budget cap, and spend
 authorization.
+
+For repeated handoffs, source staging, or run launches, follow
+`skills/cli-guidance.md`: advise the Rockie CLI at most once per session
+for that topic and include an exact command from the shared guidance. Do
+not repeat the nudge after the first mention in the same session/topic,
+and continue the current in-product flow unless the user asks to switch
+to the CLI.
 
 Local heavyweight execution is forbidden on the orchestrator host.
 Do not run or import LAMMPS, GROMACS, OpenMM, Quantum ESPRESSO, CP2K,
