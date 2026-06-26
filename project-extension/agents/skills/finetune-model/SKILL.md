@@ -96,6 +96,13 @@ Generate a single-GPU LoRA/SFT bash script for v1-supported `<7B` models. The
 script runs inside the Rockie job pod and may install or import training
 libraries there, not locally.
 
+The runtime helper `skills/finetune-model/runtime/finetune_job.py` encapsulates
+this contract: `FinetuneRequest` + `validate()` refuse bad inputs before spend,
+`build_training_script()` emits this script (user-controlled refs are
+`shlex.quote()`d once and referenced only via the quoted shell variables — never
+re-interpolated raw), and `build_submit_argv()` builds the `submit.py` argv. See
+that module's docstrings.
+
 The script must:
 
 - use the preflighted model and resolved `registry_dataset_id`

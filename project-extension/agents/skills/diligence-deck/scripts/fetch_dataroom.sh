@@ -13,12 +13,12 @@
 #                   POST /api/agent-tools/source_read     {arguments:{source_id}} -> full_text
 # (platform-context/api/agent_tools/tools.py:_notebook_read / _source_read;
 #  routed through api/routers/agent_tools.py:invoke_tool; the mcp-rockie bridge
-#  in platform-runtime/overlay/multitenant/mcp-rockie/server.js makes the same
+#  in rockie-runtime/overlay/multitenant/mcp-rockie/server.js makes the same
 #  calls. notebook_read defaults notebook_id to PLATFORM_LAB_ID, so the agent
 #  grounds in its OWN lab with an empty body.)
 #
 # Auth + identity headers (already in the runtime env -- see
-# platform-runtime/overlay/multitenant/entrypoint.sh and mcp-rockie/server.js
+# rockie-runtime/overlay/multitenant/entrypoint.sh and mcp-rockie/server.js
 # authHeaders()):
 #   ROCKIELAB_API_BASE     base URL (default https://api.rockielab.com)
 #   ROCKIELAB_TENANT_TOKEN  -> X-Tenant-Token   (auth; DEV_TOKEN alias accepted)
