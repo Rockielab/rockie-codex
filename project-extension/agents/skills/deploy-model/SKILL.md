@@ -114,13 +114,25 @@ other local serving stack. Do not download model weights. Do not start a subproc
 3. `POST /api/inference/loads` with the auth headers above. Use the model id
    from the prompt and `origin_skill: "deploy-model"` when metadata is
    accepted.
-4. Poll `GET /api/inference/loads/{id}` or `GET /api/inference/loads/{id}/logs`
+4. **Size it together with the user when the model needs more than one GPU.**
+   If the loader returns `400 gpu_count_required` or `gpu_count_too_low`, the
+   model does not fit a single GPU. The error carries the facts — the model's
+   VRAM need, the GPU's VRAM, and the minimum GPU count. Do NOT report this as
+   a broken card and stop. Instead: pick `gpu_count` (at least the stated
+   minimum) and a `spend_cap_cents` that covers model download + a reasonable
+   runtime at that count, state the plan to the user in one line (e.g. "this
+   model needs ~226 GB → 2× the GPU, ~$X/hr; budget $Y — deploying"), and
+   resubmit the same `POST /api/inference/loads` with `gpu_count` and
+   `spend_cap_cents` set. `gpu_count` and `spend_cap_cents` are explicit,
+   user-facing sizing decisions — like a budget — not platform guesses; never
+   silently default them. The tenant balance still bounds total spend.
+5. Poll `GET /api/inference/loads/{id}` or `GET /api/inference/loads/{id}/logs`
    for queued/provisioning/loading/loaded/failed status. Narrate meaningful
    state changes in the lab.
-5. On HTTP 402, stop and surface the platform response through the shared redaction/sanitization boundary. Do not replace it with a custom balance check or confirmation flow.
-6. When loaded, call `GET /api/inference/loads/{id}/endpoint` or
+6. On HTTP 402, stop and surface the platform response through the shared redaction/sanitization boundary. Do not replace it with a custom balance check or confirmation flow.
+7. When loaded, call `GET /api/inference/loads/{id}/endpoint` or
    `/endpoint/wait` until the platform returns the endpoint details.
-7. Return the endpoint URL, bearer-token handling, and a copy-paste curl.
+8. Return the endpoint URL, bearer-token handling, and a copy-paste curl.
 
 ## Required final lab output
 
