@@ -1,6 +1,31 @@
 ---
 name: physics
 description: Route physics simulation, modeling, validation, and research-compute requests across force fields, molecular dynamics, electronic structure, particle transport/collision, continuum multiphysics, plasma/PIC, nuclear/radiation, and astro/cosmology. Use open-source-first engines, refuse local heavyweight execution on the orchestrator, and attach physics dashboard monitoring profiles to run plans.
+scope: community
+attribution:
+  schema_version: 1
+  authors:
+    - rockie_username: "nikhil-rao"
+      display_name: "Nikhil Rao"
+      profile_refs: ["platform-skills:nikhil-rao"]
+  maintainers:
+    - rockie_username: "nikhil-rao"
+      display_name: "Nikhil Rao"
+      profile_refs: ["platform-skills:nikhil-rao"]
+  profiles:
+    platform-skills:nikhil-rao:
+      provider: "platform-skills"
+      url: "https://github.com/Rockielab/platform-skills/tree/main/skills/physics"
+      verified: false
+  source:
+    repo: "Rockielab/platform-skills"
+    path: "skills/physics/SKILL.md"
+    version: "2026-05-28"
+    url: "https://github.com/Rockielab/platform-skills/tree/main/skills/physics"
+  contact_policy:
+    maintainer_contact: "profile_public_only"
+    contribution_channel: "product_proposals"
+  completeness: "complete"
 ---
 
 # Physics Research Router

@@ -1,6 +1,31 @@
 ---
 name: diligence-deck
 description: Produce structured acquisition due-diligence findings from deal inputs and a private data room. Triggers on "run diligence", "due diligence on", "diligence deck", "DD findings", "acquisition analysis", "data room", "ingest data room", "/diligence".
+scope: community
+attribution:
+  schema_version: 1
+  authors:
+    - rockie_username: "lena-ortiz"
+      display_name: "Lena Ortiz"
+      profile_refs: ["platform-skills:lena-ortiz"]
+  maintainers:
+    - rockie_username: "lena-ortiz"
+      display_name: "Lena Ortiz"
+      profile_refs: ["platform-skills:lena-ortiz"]
+  profiles:
+    platform-skills:lena-ortiz:
+      provider: "platform-skills"
+      url: "https://github.com/Rockielab/platform-skills/tree/main/skills/diligence-deck"
+      verified: false
+  source:
+    repo: "Rockielab/platform-skills"
+    path: "skills/diligence-deck/SKILL.md"
+    version: "2026-04-09"
+    url: "https://github.com/Rockielab/platform-skills/tree/main/skills/diligence-deck"
+  contact_policy:
+    maintainer_contact: "profile_public_only"
+    contribution_channel: "product_proposals"
+  completeness: "complete"
 ---
 
 # diligence-deck — acquisition due-diligence findings for Atlas
