@@ -22,3 +22,11 @@ jobs:
 
       - name: Run smoke suite
         run: bash tests/smoke-test.sh
+
+      - name: Install attribution test dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: python -m pip install pytest PyYAML
+
+      - name: Guard community skill attribution
+        if: matrix.os == 'ubuntu-latest'
+        run: python -m pytest tests/test_skill_attribution_preservation.py
