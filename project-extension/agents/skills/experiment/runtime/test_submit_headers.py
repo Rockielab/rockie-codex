@@ -784,6 +784,119 @@ def test_append_dashboard_network_error_warns_and_returns_none(capsys):
     assert "dashboard append failed (0)" in capsys.readouterr().err
 
 
+def test_append_training_progress_posts_step_loss_to_job_scoped_route():
+    submit_mod = load_submit_mod()
+    captured = {}
+
+    def fake_http_request(method, url, *, headers, body=None):
+        captured["method"] = method
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["body"] = json.loads(body.decode("utf-8"))
+        return 200, b'{"ok":true}'
+
+    with rockie_env():
+        with mock.patch.object(submit_mod, "_dashboard_http_request", fake_http_request):
+            result = submit_mod.append_training_progress(
+                "job-xyz/1",
+                step=12,
+                loss=0.42,
+                api_url="https://platform.test/",
+                tenant_id="t-override000",
+            )
+
+    assert result == submit_mod.TRAINING_PROGRESS_POSTED
+    assert captured["method"] == "POST"
+    # Server resolves the note from the job id; the runtime supplies NO note id.
+    assert captured["url"] == "https://platform.test/api/jobs/job-xyz%2F1/training-progress"
+    assert captured["headers"]["X-Tenant-Token"] == "service-token"
+    assert captured["headers"]["X-Tenant-Id"] == "t-override000"
+    # Exact {step,loss} payload contract — no writer, no note id.
+    assert captured["body"] == {"step": 12, "loss": 0.42}
+
+
+def test_append_training_progress_omits_absent_signal():
+    submit_mod = load_submit_mod()
+    captured = {}
+
+    def fake_http_request(method, url, *, headers, body=None):
+        captured["body"] = json.loads(body.decode("utf-8"))
+        return 200, b'{"ok":true}'
+
+    with rockie_env():
+        with mock.patch.object(submit_mod, "_dashboard_http_request", fake_http_request):
+            result = submit_mod.append_training_progress(
+                "job-xyz", loss=0.5, api_url="https://platform.test"
+            )
+
+    assert result == submit_mod.TRAINING_PROGRESS_POSTED
+    assert captured["body"] == {"loss": 0.5}
+
+
+def test_append_training_progress_empty_sample_reports_unavailable_without_request():
+    submit_mod = load_submit_mod()
+    called = {"n": 0}
+
+    def fake_http_request(method, url, *, headers, body=None):
+        called["n"] += 1
+        return 200, b'{"ok":true}'
+
+    with rockie_env():
+        with mock.patch.object(submit_mod, "_dashboard_http_request", fake_http_request):
+            result = submit_mod.append_training_progress(
+                "job-xyz", api_url="https://platform.test"
+            )
+
+    assert result == submit_mod.TRAINING_PROGRESS_UNAVAILABLE
+    assert called["n"] == 0
+
+
+def test_append_training_progress_treats_route_absent_codes_as_unavailable():
+    submit_mod = load_submit_mod()
+
+    for code in (404, 405, 501):
+        def fake_http_request(method, url, *, headers, body=None, _code=code):
+            return _code, b'{"detail":"Not Found"}'
+
+        with rockie_env():
+            with mock.patch.object(submit_mod, "_dashboard_http_request", fake_http_request):
+                result = submit_mod.append_training_progress(
+                    "job-xyz", step=1, api_url="https://platform.test"
+                )
+        assert result == submit_mod.TRAINING_PROGRESS_UNAVAILABLE, code
+
+
+def test_append_training_progress_reports_failed_on_server_error(capsys):
+    submit_mod = load_submit_mod()
+
+    def fake_http_request(method, url, *, headers, body=None):
+        return 500, b'{"error":{"code":"training_progress_append_failed"}}'
+
+    with rockie_env():
+        with mock.patch.object(submit_mod, "_dashboard_http_request", fake_http_request):
+            result = submit_mod.append_training_progress(
+                "job-xyz", step=1, api_url="https://platform.test"
+            )
+
+    assert result == submit_mod.TRAINING_PROGRESS_FAILED
+    assert "dashboard training-progress failed (500)" in capsys.readouterr().err
+
+
+def test_append_training_progress_reports_failed_on_validation_422():
+    submit_mod = load_submit_mod()
+
+    def fake_http_request(method, url, *, headers, body=None):
+        return 422, b'{"detail":"step/loss must be finite"}'
+
+    with rockie_env():
+        with mock.patch.object(submit_mod, "_dashboard_http_request", fake_http_request):
+            result = submit_mod.append_training_progress(
+                "job-xyz", step=1, api_url="https://platform.test"
+            )
+
+    assert result == submit_mod.TRAINING_PROGRESS_FAILED
+
+
 def test_safe_summary_redacts_common_secret_shapes():
     submit_mod = load_submit_mod()
     summary = submit_mod._safe_summary(
@@ -859,6 +972,13 @@ def test_active_poll_appends_heartbeat_state_log_and_unavailable_metric():
     append_kwargs = appended[0][1]
     assert append_kwargs["job_id"] == "job-poll"
     assert append_kwargs["status_patch"]["job_state"] == "RUNNING"
+    assert append_kwargs["status_patch"]["monitor_owner"] == "experiment"
+    assert append_kwargs["status_patch"]["monitor_target"] == {"kind": "job", "id": "job-poll"}
+    assert append_kwargs["status_patch"]["state"] == "running"
+    assert append_kwargs["status_patch"]["utilization"]["state"] == "unavailable"
+    assert append_kwargs["status_patch"]["utilization"]["reason_code"] == "telemetry_not_exposed"
+    assert append_kwargs["status_patch"]["spend"]["state"] == "unavailable"
+    assert append_kwargs["status_patch"]["spend"]["reason_code"] == "spend_not_exposed"
     assert "cost_so_far_cents" not in append_kwargs["status_patch"]
     assert append_kwargs["metrics"] == [
         {
@@ -874,6 +994,9 @@ def test_active_poll_appends_heartbeat_state_log_and_unavailable_metric():
     assert append_kwargs["verdicts"][0]["verdict"] == "continue"
     assert len(finalized) == 1
     assert finalized[0][1]["outcome"] == "success"
+    assert finalized[0][1]["status_patch"]["monitor_target"] == {"kind": "job", "id": "job-poll"}
+    assert finalized[0][1]["status_patch"]["spend"]["state"] == "live"
+    assert finalized[0][1]["status_patch"]["spend"]["reason_code"] is None
 
 
 def test_active_poll_retries_heartbeat_after_failed_append():
@@ -953,23 +1076,129 @@ def test_active_poll_appends_finetune_progress_metrics():
         ]
     )
 
+    progress_calls = []
+
     with mock.patch.object(submit_mod, "get_job", side_effect=lambda *args, **kwargs: next(jobs)):
-        with mock.patch.object(submit_mod, "append_dashboard", side_effect=lambda *args, **kwargs: appended.append((args, kwargs))):
-            with mock.patch.object(submit_mod, "finalize_dashboard", return_value={"ok": True}):
-                with mock.patch.object(submit_mod.time, "sleep", return_value=None):
-                    stdout = io.StringIO()
-                    with contextlib.redirect_stdout(stdout):
+        with mock.patch.object(
+            submit_mod,
+            "append_training_progress",
+            side_effect=lambda *args, **kwargs: progress_calls.append((args, kwargs))
+            or submit_mod.TRAINING_PROGRESS_POSTED,
+        ):
+            with mock.patch.object(submit_mod, "append_dashboard", side_effect=lambda *args, **kwargs: appended.append((args, kwargs))):
+                with mock.patch.object(submit_mod, "finalize_dashboard", return_value={"ok": True}):
+                    with mock.patch.object(submit_mod.time, "sleep", return_value=None):
+                        stdout = io.StringIO()
+                        with contextlib.redirect_stdout(stdout):
+                            exit_code = submit_mod.poll(
+                                "job-finetune",
+                                quiet=True,
+                                dashboard_note_id="note:finetune",
+                            )
+
+    assert exit_code == 0
+    # Hardened path: {step,loss} forwarded to the server-resolved endpoint by
+    # job id (no note id supplied by the runtime).
+    assert len(progress_calls) == 1
+    assert progress_calls[0][0] == ("job-finetune",)
+    assert progress_calls[0][1]["step"] == 12
+    assert progress_calls[0][1]["loss"] == 0.42
+    # On a successful post the metrics are NOT double-written via the generic
+    # dashboard append.
+    assert len(appended) == 1
+    assert {"name": "training.step", "value": 12} not in appended[0][1]["metrics"]
+    assert {"name": "training.loss", "value": 0.42} not in appended[0][1]["metrics"]
+    assert "[finetune]" not in stdout.getvalue()
+
+
+def test_active_poll_falls_back_to_dashboard_metrics_when_endpoint_unavailable():
+    """Older backend (no training-progress route) → metrics ride the legacy append."""
+    submit_mod = load_submit_mod()
+    appended = []
+    jobs = iter(
+        [
+            {
+                "id": "job-finetune-fallback",
+                "state": "RUNNING",
+                "gpu_count": 1,
+                "gpu_type": "A100_80GB",
+                "last_log_line": 'FINETUNE_PROGRESS {"step":7,"loss":1.5}',
+            },
+            {
+                "id": "job-finetune-fallback",
+                "state": "DONE",
+                "gpu_count": 1,
+                "gpu_type": "A100_80GB",
+                "cost_actual_cents": 100,
+                "last_log_line": "JOB_DONE",
+            },
+        ]
+    )
+
+    with mock.patch.object(submit_mod, "get_job", side_effect=lambda *args, **kwargs: next(jobs)):
+        with mock.patch.object(
+            submit_mod,
+            "append_training_progress",
+            return_value=submit_mod.TRAINING_PROGRESS_UNAVAILABLE,
+        ):
+            with mock.patch.object(submit_mod, "append_dashboard", side_effect=lambda *args, **kwargs: appended.append((args, kwargs))):
+                with mock.patch.object(submit_mod, "finalize_dashboard", return_value={"ok": True}):
+                    with mock.patch.object(submit_mod.time, "sleep", return_value=None):
                         exit_code = submit_mod.poll(
-                            "job-finetune",
+                            "job-finetune-fallback",
                             quiet=True,
                             dashboard_note_id="note:finetune",
                         )
 
     assert exit_code == 0
     assert len(appended) == 1
-    assert {"name": "training.step", "value": 12} in appended[0][1]["metrics"]
-    assert {"name": "training.loss", "value": 0.42} in appended[0][1]["metrics"]
-    assert "[finetune]" not in stdout.getvalue()
+    assert {"name": "training.step", "value": 7} in appended[0][1]["metrics"]
+    assert {"name": "training.loss", "value": 1.5} in appended[0][1]["metrics"]
+
+
+def test_active_poll_falls_back_to_dashboard_metrics_when_endpoint_failed():
+    """Route exists but the write errored → still degrade onto the legacy append."""
+    submit_mod = load_submit_mod()
+    appended = []
+    jobs = iter(
+        [
+            {
+                "id": "job-finetune-failed",
+                "state": "RUNNING",
+                "gpu_count": 1,
+                "gpu_type": "A100_80GB",
+                "last_log_line": 'FINETUNE_PROGRESS {"step":3,"loss":2.0}',
+            },
+            {
+                "id": "job-finetune-failed",
+                "state": "DONE",
+                "gpu_count": 1,
+                "gpu_type": "A100_80GB",
+                "cost_actual_cents": 100,
+                "last_log_line": "JOB_DONE",
+            },
+        ]
+    )
+
+    with mock.patch.object(submit_mod, "get_job", side_effect=lambda *args, **kwargs: next(jobs)):
+        with mock.patch.object(
+            submit_mod,
+            "append_training_progress",
+            return_value=submit_mod.TRAINING_PROGRESS_FAILED,
+        ):
+            with mock.patch.object(submit_mod, "append_dashboard", side_effect=lambda *args, **kwargs: appended.append((args, kwargs))):
+                with mock.patch.object(submit_mod, "finalize_dashboard", return_value={"ok": True}):
+                    with mock.patch.object(submit_mod.time, "sleep", return_value=None):
+                        exit_code = submit_mod.poll(
+                            "job-finetune-failed",
+                            quiet=True,
+                            dashboard_note_id="note:finetune",
+                        )
+
+    assert exit_code == 0
+    assert len(appended) == 1
+    assert {"name": "training.step", "value": 3} in appended[0][1]["metrics"]
+    assert {"name": "training.loss", "value": 2.0} in appended[0][1]["metrics"]
 
 
 def test_active_poll_prints_finetune_progress_when_not_quiet():
@@ -1179,6 +1408,41 @@ def test_poll_without_dashboard_note_id_performs_no_dashboard_mutations():
     finalize.assert_not_called()
 
 
+def test_terminal_cost_actual_only_finalize_uses_settled_spend():
+    submit_mod = load_submit_mod()
+    finalizations = []
+    job = {
+        "id": "job-settled",
+        "state": "DONE",
+        "gpu_count": 1,
+        "gpu_type": "A100_80GB",
+        "cost_actual_cents": 321,
+        "last_log_line": "done",
+    }
+
+    with mock.patch.object(submit_mod, "get_job", return_value=job):
+        with mock.patch.object(submit_mod, "append_dashboard") as append:
+            with mock.patch.object(
+                submit_mod,
+                "finalize_dashboard",
+                side_effect=lambda *args, **kwargs: finalizations.append((args, kwargs)),
+            ):
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    exit_code = submit_mod.poll(
+                        "job-settled",
+                        quiet=True,
+                        dashboard_note_id="note:settled",
+                    )
+
+    assert exit_code == 0
+    append.assert_not_called()
+    assert len(finalizations) == 1
+    assert finalizations[0][1]["status_patch"]["spend"]["state"] == "settled"
+    assert finalizations[0][1]["status_patch"]["spend"]["reason_code"] is None
+    assert finalizations[0][1]["status_patch"]["spend"]["reason"] is not None
+
+
 def test_dashboard_mutation_failures_warn_without_masking_job_exit(capsys):
     submit_mod = load_submit_mod()
     requests = []
@@ -1366,3 +1630,37 @@ def _approved_term_sheet():
             "approved_for_submit": True,
         },
     }
+
+
+if __name__ == "__main__":
+    import inspect
+    import tempfile
+    from types import SimpleNamespace
+
+    class _Capsys:
+        def __init__(self, stdout: io.StringIO, stderr: io.StringIO) -> None:
+            self._stdout = stdout
+            self._stderr = stderr
+
+        def readouterr(self):
+            return SimpleNamespace(out=self._stdout.getvalue(), err=self._stderr.getvalue())
+
+    tests = [
+        obj
+        for name, obj in globals().items()
+        if name.startswith("test_") and callable(obj)
+    ]
+    for test in sorted(tests, key=lambda fn: fn.__name__):
+        kwargs = {}
+        signature = inspect.signature(test)
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        for name in signature.parameters:
+            if name == "tmp_path":
+                tempdir = tempfile.TemporaryDirectory()
+                kwargs[name] = Path(tempdir.name)
+            elif name == "capsys":
+                kwargs[name] = _Capsys(stdout, stderr)
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            test(**kwargs)
+    print(f"OK - {len(tests)} experiment submit checks passed")

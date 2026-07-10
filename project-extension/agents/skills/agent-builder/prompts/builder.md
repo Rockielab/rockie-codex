@@ -71,6 +71,21 @@ reset per round) only when you cannot spawn subagents. **Do not mark the agent
 publishable unless the verdict says `publishable: true`.** A non-converging gate
 hands off for human review — never override it.
 
+Live critic transport must be real and explicit. Missing transport, malformed
+critic JSON, non-object JSON, invalid verdict schema, or transport failure is a
+failed round, never a clean round. Do not synthesize passing live verdicts.
+
+When gating a platform edit, first call `POST /api/agents/{id}/edits`, then
+materialize the review artifact from the current agent record plus the returned
+`candidate`. Verify the canonical JSON SHA-256 of that candidate matches the
+returned `candidate_fingerprint`; a mismatch halts. Map the internal verdict to
+the backend `GauntletVerdict` fields (`publishable`, `clean_rounds`,
+`produced_at`, `candidate_fingerprint`, `rounds` as the per-round list, optional
+`notes`) and attach it unchanged to
+`POST /api/agents/{id}/edits/{edit_id}/gauntlet`. This attach flow uses the normal
+agents route `rockielab_session` cookie. Do not use or invent an `X-Tenant-Token`
+or password/CLI bearer path for agent edits.
+
 ### 6. Export
 
 Once publishable, run `scripts/af_export.py --agent <target> --out <name>.af` to

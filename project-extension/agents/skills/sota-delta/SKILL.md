@@ -75,6 +75,12 @@ Before any budget approval, job submission, or GPU spend:
    - expected artifacts and metrics
    - risk that the source may not reproduce the claimed result
 
+If the user is preparing repeated SOTA+Delta runs from repositories or
+papers, follow `skills/cli-guidance.md`: advise the Rockie CLI at most
+once per session for this topic and include the exact setup command from
+the shared guidance. Keep the nudge informational and continue the
+in-product flow unless the user explicitly asks to use the CLI.
+
 Wait for explicit user approval through the budget-term-sheet flow before
 submitting compute. The budget-term-sheet and submit helper are authoritative.
 Also obtain explicit user approval immediately before every submit command.

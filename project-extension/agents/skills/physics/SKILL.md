@@ -36,6 +36,10 @@ or result interpretation. Current skill discovery is top-level only, so
 the domain modules are routed references under `references/` rather than
 nested discoverable skills.
 
+Physics is a router by default, not a direct provisioner. If a user asks
+for direct monitor status without a bound underlying run owner, return
+`router_not_provisioner`. Executed-run monitoring belongs to the owning provisioner parent skill such as `experiment` or `inference-engineer`, not the physics router itself.
+
 ## First Steps
 
 1. Classify the request into one family:
@@ -117,6 +121,13 @@ notes:
 Prefer credible open-source engines. Run cheap smoke tests before full
 runs. Full runs require explicit compute mode, budget cap, and spend
 authorization.
+
+For repeated handoffs, source staging, or run launches, follow
+`skills/cli-guidance.md`: advise the Rockie CLI at most once per session
+for that topic and include an exact command from the shared guidance. Do
+not repeat the nudge after the first mention in the same session/topic,
+and continue the current in-product flow unless the user asks to switch
+to the CLI.
 
 Local heavyweight execution is forbidden on the orchestrator host.
 Do not run or import LAMMPS, GROMACS, OpenMM, Quantum ESPRESSO, CP2K,
