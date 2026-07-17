@@ -32,9 +32,36 @@ LAUNCHER_RE='python[0-9]*(\.[0-9]+)?|accelerate|torchrun|deepspeed'
 # `python3?` — that missed `python3.11`, `python3.12`, etc. (security M-2).
 echo "$CMD_NO_COMMENT" | grep -qE "($LAUNCHER_RE)[[:space:]].*\.py" || exit 0
 
-# Extract the .py target from the command. Prefer the last .py token — handles
-# "torchrun --nproc-per-node 8 src/train.py --arg X" layouts.
-SCRIPT_PATH=$(echo "$CMD_NO_COMMENT" | grep -oE '[[:graph:]]+\.py' | tail -1)
+# Extract the .py argument that belongs to the LAUNCHER's OWN invocation —
+# not just any .py-looking token anywhere in the command. Bug (ported fix
+# from Rockielab/rockie-claude, found via dogfooding): a compound command
+# like
+#   python3 real_train.py --help || find . -name "other_thing.py"
+# used to have its LAST .py token win ("prefer the last .py token"), so an
+# unrelated `find -name` pattern in a later clause could hijack extraction
+# away from the script actually being launched.
+#
+# Fix: split the command on shell separators (; & |), then scan segments in
+# order; the first segment that invokes a launcher yields the first
+# .py-looking token AFTER the launcher token within that same segment. This
+# also handles "torchrun --nproc-per-node 8 src/train.py --arg X" layouts,
+# where the script isn't the token immediately after the launcher.
+SCRIPT_PATH=""
+while IFS= read -r seg; do
+  echo "$seg" | grep -qE "$LAUNCHER_RE" || continue
+  AFTER=$(echo "$seg" | sed -E "s/.*($LAUNCHER_RE)[[:space:]]*//")
+  TOK=$(printf '%s' "$AFTER" | grep -oE "\"[^\"]*\\.py\"|'[^']*\\.py'|[^[:space:]]+\\.py" | head -1)
+  if [ -n "$TOK" ]; then
+    SCRIPT_PATH="$TOK"
+    break
+  fi
+done < <(printf '%s\n' "$CMD_NO_COMMENT" | tr ';&|' '\n')
+
+# Strip surrounding quote characters — the token may be `"train.py"` or
+# 'train.py' if the launcher's argument was quoted in the shell.
+SCRIPT_PATH="${SCRIPT_PATH%\"}"; SCRIPT_PATH="${SCRIPT_PATH#\"}"
+SCRIPT_PATH="${SCRIPT_PATH%\'}"; SCRIPT_PATH="${SCRIPT_PATH#\'}"
+
 [ -z "$SCRIPT_PATH" ] && exit 0
 
 # Smoke-test exceptions — check the comment-stripped string so a `# --smoke`
@@ -63,6 +90,31 @@ fi
 # Resolve script path relative to cwd
 RESOLVED="${CWD_JSON:-$PWD}/$SCRIPT_PATH"
 [ ! -f "$RESOLVED" ] && { RESOLVED="$SCRIPT_PATH"; }
+
+# If neither resolution attempt points at a real file, extraction did not
+# land on an actual script — a nonexistent path cannot be a training run
+# being launched from this CWD. Fail OPEN narrowly for THIS reason only
+# (stderr-noted, so it's visible but not alarming); a real script that
+# exists but lacks a dry-run sentinel is still blocked below. This closes
+# the failure mode where a malformed/mis-extracted token used to reach
+# dry_run_gate.sh's "no such script: <path>" error, which reads as a hard
+# block rather than "extraction produced nothing usable".
+if [ ! -f "$RESOLVED" ]; then
+  echo "[pre-train-gate] extracted target '$SCRIPT_PATH' is not a file on disk — not a training launch, allowing" >&2
+  exit 0
+fi
+
+# Harness-internal utility scripts must never trip this gate — same
+# rationale as the audit.py exemption below (ported from
+# Rockielab/rockie-claude#24 bug 3), extended to the harness's own
+# scripts/ dir (calibration.py, journal.py, queue.py, budget.py, etc. in
+# the installed `.codex/scripts/` layout). $ROOT is derived from this
+# hook's own installed location, not from user input, so this can't be
+# spoofed by an attacker-named file placed elsewhere in the repo.
+RESOLVED_DIR=$(cd "$(dirname "$RESOLVED")" 2>/dev/null && pwd -P)
+if [ "$RESOLVED_DIR" = "$ROOT/scripts" ]; then
+  exit 0
+fi
 
 # Narrow the matcher to actual training/eval entry points (ported from
 # Rockielab/rockie-claude#24 bug 3). The prior matcher fired on ANY
