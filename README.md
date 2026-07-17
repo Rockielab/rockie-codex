@@ -192,6 +192,26 @@ After install, tell the user:
 Optionally verify with `bash ~/rockie-codex/tests/smoke-test.sh` —
 75+ assertions, about a minute, no API key required.
 
+**Also read this — you can pull skills for yourself.** The `rockie` CLI
+fronts ~300 platform skills (ML training/inference, biology, chemistry,
+physics, databases, coding). They are kept out of your context
+deliberately; you browse and pull the ones your current task needs, and
+a pulled skill is usable in the same session:
+
+```bash
+rockie skill catalog --search grpo --json      # browse
+rockie skill pull grpo-rl-training --out .agents/skills/grpo-rl-training
+$grpo-rl-training                              # usable immediately
+```
+
+Before writing expert guidance on a named framework from scratch, search
+the catalog first. Pull by `catalog_id`, invoke by the pulled
+`SKILL.md`'s frontmatter `name` (they differ for ~13% of entries). The
+CLI is optional — `curl -fsSL https://rockielab.com/install.sh | sh`
+then `rockie auth login` — and everything here works without it. Full
+procedure and context-budget rules: `$find-skills`
+(`project-extension/agents/skills/find-skills/SKILL.md`).
+
 If you (the agent) need the longer explanation of what each component
 does and why, the rest of this README is written for you too — the
 skills table, the `[LEARN]` protocol section, and `docs/ARCHITECTURE.md`

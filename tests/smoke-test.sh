@@ -20,6 +20,8 @@
 #   • Dry-run gate: register / check / hook before & after modify
 #   • Pre-commit gate: clean-hash round-trip
 #   • FTS5 hyphen-as-NOT-operator documented + tested
+#   • Skill catalog on-ramp: silent with no CLI, once-per-project with one,
+#     never shells out at SessionStart (fake rockie — no network/auth)
 #
 # Exits 0 on success, 1 on first failing assertion.
 set -u
@@ -30,7 +32,7 @@ SQLITE=/usr/bin/sqlite3
 ROCKIE="$(cd "$(dirname "$0")/.." && pwd)"
 WORK=$(mktemp -d -t rockie-codex-smoke-XXXXXX)
 # Clean up any per-test tempdirs that escape the main WORK; set a broad trap.
-trap 'rm -rf "$WORK"; rm -rf /tmp/rockie-autopilot-* /tmp/rockie-migration-* /tmp/smoke-merge-* /tmp/smoke-idem-* 2>/dev/null' EXIT
+trap 'rm -rf "$WORK"; rm -rf /tmp/rockie-autopilot-* /tmp/rockie-migration-* /tmp/smoke-merge-* /tmp/smoke-idem-* /tmp/smoke-catalog-* 2>/dev/null' EXIT
 
 PASS=0
 FAIL=0
@@ -626,6 +628,168 @@ if "$SQLITE" "$DB" "SELECT COUNT(*) FROM learnings_fts WHERE learnings_fts MATCH
   fail "FTS5 accepted unsanitized hyphen — load-relevant-rules sanitization is needed"
 else
   ok "FTS5 errors on unsanitized hyphen (sanitization is load-bearing)"
+fi
+
+# ── Skill catalog on-ramp ────────────────────────────────────────────────
+section "skill catalog on-ramp"
+
+# The on-ramp must never depend on a live CLI: it has to stay silent when
+# rockie is absent, fire exactly once when present, and never make a
+# network call at SessionStart. All of this is tested with a FAKE rockie
+# on PATH — no auth, no tenant, no network.
+
+# find-skills ships and installs like any other Codex skill.
+python3 - "$PROJ/.agents/skills/find-skills/SKILL.md" <<'PY' && ok "find-skills SKILL.md installs with valid frontmatter" || fail "find-skills frontmatter"
+import pathlib, re, sys
+p = pathlib.Path(sys.argv[1])
+assert p.exists(), f"missing {p}"
+m = re.match(r"---\n(.*?)\n---", p.read_text(), re.DOTALL)
+assert m, "no frontmatter block"
+fm = m.group(1)
+assert re.search(r"^name: find-skills$", fm, re.M), "bad/missing name"
+d = re.search(r"^description: (.+)$", fm, re.M)
+assert d and len(d.group(1)) > 40, "missing/short description"
+PY
+
+# Codex has no repo-defined slash commands (docs/EVENT-MAPPING.md § Skill
+# invocation delta) — guidance must use $skill, and must point at the
+# Codex skills dir, not the Claude one.
+FS="$ROCKIE/project-extension/agents/skills/find-skills/SKILL.md"
+if grep -q '\.agents/skills' "$FS" && ! grep -q '\.claude/skills' "$FS"; then
+  ok "find-skills targets .agents/skills (not the Claude path)"
+else
+  fail "find-skills must target .agents/skills and never .claude/skills"
+fi
+if grep -q '\$find-skills' "$FS" && grep -q '\$serving-llms-vllm' "$FS"; then
+  ok "find-skills uses Codex \$skill invocation, not /slash"
+else
+  fail "find-skills must use \$skill invocation (EVENT-MAPPING skill delta)"
+fi
+
+# The two CLI facts that are runtime-independent and easy to get wrong.
+if grep -q 'catalog_id' "$FS" && grep -q 'substring match' "$FS"; then
+  ok "find-skills documents pull-by-catalog_id + substring --search"
+else
+  fail "find-skills must document catalog_id vs name and substring search"
+fi
+
+# A fake rockie: records every invocation to a tripwire, exits with a
+# configurable code so we can simulate logged-out (exit 2).
+FAKEBIN="$WORK/fakebin"
+mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/rockie" <<'EOF'
+#!/usr/bin/env bash
+[ -n "${ROCKIE_TRIPWIRE:-}" ] && echo "$*" >> "$ROCKIE_TRIPWIRE"
+exit "${FAKE_ROCKIE_EXIT:-0}"
+EOF
+chmod +x "$FAKEBIN/rockie"
+
+# A PATH with no rockie on it at all (strip the real one if this machine
+# has it installed — a dev box will, CI won't).
+_path_without_rockie() {
+  local real dir
+  real=$(command -v rockie 2>/dev/null || true)
+  if [ -z "$real" ]; then printf '%s' "$PATH"; return; fi
+  dir=$(dirname "$real")
+  printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "$dir" | paste -sd: -
+}
+NOROCKIE_PATH=$(_path_without_rockie)
+
+ONRAMP_PROJ="$WORK/onramp-proj"
+mkdir -p "$ONRAMP_PROJ/.codex"
+rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/codex/" "$ONRAMP_PROJ/.codex/" >/dev/null
+SR="$ONRAMP_PROJ/.codex/scripts/session_report.py"
+
+# ── CLI ABSENT: silent, exit 0, no sentinel burned ──
+ABSENT_OUT=$(env PATH="$NOROCKIE_PATH" python3 "$SR" 2>/dev/null); ABSENT_RC=$?
+if [ "$ABSENT_RC" = "0" ]; then
+  ok "session report exits 0 when rockie CLI is absent"
+else
+  fail "session report exit=$ABSENT_RC with no CLI (must never break a session)"
+fi
+assert "no catalog on-ramp when CLI absent (never nag a non-customer)" \
+  "0" "$(printf '%s' "$ABSENT_OUT" | grep -c 'Skill catalog available')"
+assert "report still renders fully when CLI absent" \
+  "1" "$(printf '%s' "$ABSENT_OUT" | grep -c 'What to do next')"
+ABSENT_ERR=$(env PATH="$NOROCKIE_PATH" python3 "$SR" 2>&1 >/dev/null)
+assert "no stderr noise when CLI absent" "" "$ABSENT_ERR"
+if [ -f "$ONRAMP_PROJ/.codex/.state/catalog-onramp-shown" ]; then
+  fail "sentinel burned while CLI absent (on-ramp would be lost once installed)"
+else
+  ok "sentinel not burned when CLI absent (on-ramp survives a later install)"
+fi
+
+# ── CLI PRESENT: fires exactly once, and never shells out ──
+TRIPWIRE="$WORK/rockie-tripwire"
+rm -f "$TRIPWIRE"
+FIRST=$(env PATH="$FAKEBIN:$NOROCKIE_PATH" ROCKIE_TRIPWIRE="$TRIPWIRE" python3 "$SR" 2>/dev/null)
+SECOND=$(env PATH="$FAKEBIN:$NOROCKIE_PATH" ROCKIE_TRIPWIRE="$TRIPWIRE" python3 "$SR" 2>/dev/null)
+assert "catalog on-ramp fires on first session when CLI present" \
+  "1" "$(printf '%s' "$FIRST" | grep -c 'Skill catalog available')"
+assert "catalog on-ramp names the browse command" \
+  "1" "$(printf '%s' "$FIRST" | grep -c 'rockie skill catalog --search')"
+if printf '%s' "$FIRST" | grep -q 'rockie skill pull <catalog_id> --out \.agents/skills/' \
+   && ! printf '%s' "$FIRST" | grep -q '\.claude/skills'; then
+  ok "catalog on-ramp pulls into the Codex skills dir (not the Claude one)"
+else
+  fail "catalog on-ramp must pull into .agents/skills, never .claude/skills"
+fi
+assert "catalog on-ramp is once-per-project (silent on 2nd session)" \
+  "0" "$(printf '%s' "$SECOND" | grep -c 'Skill catalog available')"
+if [ -s "$TRIPWIRE" ]; then
+  fail "SessionStart shelled out to rockie ($(head -1 "$TRIPWIRE")) — must stay offline (~1.7s network call)"
+else
+  ok "SessionStart never invokes the rockie CLI (stays offline/fast)"
+fi
+
+# ── CLI PRESENT BUT LOGGED OUT (exit 2): still must not break ──
+LOGGEDOUT_PROJ="$WORK/onramp-logout"
+mkdir -p "$LOGGEDOUT_PROJ/.codex"
+rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/codex/" "$LOGGEDOUT_PROJ/.codex/" >/dev/null
+LO_OUT=$(env PATH="$FAKEBIN:$NOROCKIE_PATH" FAKE_ROCKIE_EXIT=2 \
+  python3 "$LOGGEDOUT_PROJ/.codex/scripts/session_report.py" 2>/dev/null); LO_RC=$?
+if [ "$LO_RC" = "0" ]; then
+  ok "session report exits 0 when rockie CLI is logged out (exit 2)"
+else
+  fail "session report exit=$LO_RC when CLI logged out (must never break a session)"
+fi
+assert "report renders when CLI logged out" \
+  "1" "$(printf '%s' "$LO_OUT" | grep -c 'What to do next')"
+
+# find-skills documents the degraded exit codes an agent will actually hit.
+if grep -q 'rockie auth login' "$FS" && grep -q '127' "$FS" && grep -q 'command -v rockie' "$FS"; then
+  ok "find-skills documents auth (exit 2) + absent (127) + the guard"
+else
+  fail "find-skills must document exit 2 / 127 / the command -v guard"
+fi
+
+# cli-guidance gained the agent-facing half (it was human-nudge-only).
+CG="$ROCKIE/project-extension/agents/skills/cli-guidance.md"
+if grep -qi 'Agent skill acquisition' "$CG" && grep -q 'rockie skill pull' "$CG"; then
+  ok "cli-guidance.md documents agent skill acquisition"
+else
+  fail "cli-guidance.md missing agent skill-acquisition section"
+fi
+
+# The installer tells whoever is reading the terminal, either way.
+CAT_PROJ=$(mktemp -d -t smoke-catalog-XXXXXX)
+(cd "$CAT_PROJ" && git init -q)
+INST_PRESENT=$(env PATH="$FAKEBIN:$NOROCKIE_PATH" bash "$ROCKIE/install.sh" --project-only --yes "$CAT_PROJ" 2>&1)
+assert "installer surfaces the catalog when rockie is installed" \
+  "1" "$(printf '%s' "$INST_PRESENT" | grep -c 'skill catalog: the rockie CLI is installed')"
+CAT_PROJ2=$(mktemp -d -t smoke-catalog-XXXXXX)
+(cd "$CAT_PROJ2" && git init -q)
+INST_ABSENT=$(env PATH="$NOROCKIE_PATH" bash "$ROCKIE/install.sh" --project-only --yes "$CAT_PROJ2" 2>&1)
+assert "installer offers the CLI when rockie is absent" \
+  "1" "$(printf '%s' "$INST_ABSENT" | grep -c 'optional: the rockie CLI')"
+rm -rf "$CAT_PROJ" "$CAT_PROJ2"
+
+# Both AGENTS.md templates carry the on-ramp.
+if grep -q 'find-skills' "$ROCKIE/agents-md/AGENTS.md.template" \
+   && grep -q 'find-skills' "$ROCKIE/agents-md/ml-research.md"; then
+  ok "both AGENTS.md templates point at the skill catalog"
+else
+  fail "AGENTS.md templates missing the skill-catalog on-ramp"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────

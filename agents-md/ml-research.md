@@ -110,6 +110,33 @@ After the run, `calibration.py close <run_id> <hypothesis> <actual_delta>` close
 
 Only build what survives all four stages.
 
+## Skill catalog — pull the framework expertise
+
+`ml-training` is the largest category in the Rockie catalog (~50 skills),
+with `ml-inference` alongside it. Before hand-rolling a training or eval
+setup, check whether the expertise already exists:
+
+```bash
+rockie skill catalog --search grpo --json         # or: --category ml-training
+rockie skill pull grpo-rl-training --out .agents/skills/grpo-rl-training
+$grpo-rl-training                                 # usable immediately
+```
+
+Real pull ids include `grpo-rl-training`, `verl`, `openrlhf`,
+`trl-fine-tuning`, `simpo`, `unsloth`, `lm-evaluation-harness`,
+`llm-as-judge-evaluation`, `vllm`, `sglang`, `tensorrt-llm`. These ship
+`templates/` and `examples/` you can run, not just prose.
+
+Pull by `catalog_id`, invoke by the pulled `SKILL.md`'s frontmatter
+`name` — they differ for ~13% of entries (`pull vllm` →
+`$serving-llms-vllm`).
+
+Fold this into the Waterfall's **Research** step: check the catalog
+alongside the literature. Pull only what the current direction needs —
+each kept skill costs a description at every session start, so
+`rm -rf .agents/skills/<name>` when you're done. Details: `$find-skills`.
+No `rockie` CLI on PATH? Skip it and do the work directly.
+
 ## Hard Rules (ML-research-specific; seed with `examples/seed_example_ml_research.py`)
 
 - Verify before claiming. Use web search or research agents.

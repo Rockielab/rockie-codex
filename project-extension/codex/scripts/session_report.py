@@ -37,6 +37,7 @@ TASTE_DIR = REPO / ".rockie" / "taste"
 TASTE_INDEX = TASTE_DIR / "INDEX.md"
 MODES_DIR = TASTE_DIR / "modes"
 MODE_ACTIVE = MODES_DIR / "_active"
+CATALOG_SENTINEL = ROOT / ".state" / "catalog-onramp-shown"
 
 OK = "✓"
 WARN = "⚠"
@@ -240,6 +241,61 @@ def _parse_soft_topics(idx_md: str) -> list:
     return [line.strip(" -").strip() for line in block.group(1).splitlines() if line.strip()]
 
 
+def catalog_onramp() -> Optional[str]:
+    """Once-per-project pointer at the platform skill catalog.
+
+    The catalog (~300 skills) is deliberately NOT in context — that's the
+    whole reason it lives behind the CLI. But an agent that never learns
+    the catalog exists never pulls from it, so the harness says so once,
+    on the first session in a project, and then never again.
+
+    Two deliberate constraints:
+
+    * **Offline.** `shutil.which` only (~0.02ms). Never shell out to
+      `rockie skill catalog` here — that's a ~1.7s network round-trip,
+      and SessionStart stays fast and offline (same reason gpu_pods reads
+      the local table instead of a provider API).
+    * **Silent for non-customers.** No CLI on PATH → return None. We do
+      not advertise a product to someone who hasn't installed it; the
+      README and installer already cover that channel.
+
+    Returns the block once, then writes a sentinel and returns None
+    forever after. The sentinel lives in gitignored `.state/`, so a fresh
+    clone re-shows it once to the next agent — which is correct.
+    """
+    if shutil.which("rockie") is None:
+        return None
+    if CATALOG_SENTINEL.exists():
+        return None
+    try:
+        CATALOG_SENTINEL.parent.mkdir(parents=True, exist_ok=True)
+        CATALOG_SENTINEL.write_text("shown\n")
+    except OSError:
+        # Can't write the sentinel → don't emit, rather than emit every
+        # session. Nagging is worse than staying quiet.
+        return None
+    return (
+        "## Skill catalog available (shown once per project)\n"
+        "\n"
+        "The `rockie` CLI is on PATH. It fronts ~300 platform skills "
+        "(ml-training, ml-inference, biology, chemistry, physics, databases, "
+        "coding, …) that are kept out of your context on purpose. Pull the "
+        "ones this project needs:\n"
+        "\n"
+        "```bash\n"
+        "rockie skill catalog --search <topic> --json   # browse\n"
+        "rockie skill pull <catalog_id> --out .agents/skills/<catalog_id>\n"
+        "```\n"
+        "\n"
+        "A pulled skill is usable immediately — same `name` + `description` "
+        "frontmatter contract as any other skill in `.agents/skills/`. Pull "
+        "by `catalog_id`, invoke by the pulled frontmatter `name` (`$<name>`); "
+        "they differ for ~13% of entries. Before writing expert guidance on a "
+        "named framework from scratch, search the catalog first. Full "
+        "procedure + context-budget rules: `$find-skills`.\n"
+    )
+
+
 def project_name() -> str:
     env = os.environ.get("PROJECT")
     if env:
@@ -420,6 +476,14 @@ def render() -> str:
         out.append("```")
         out.append(state_tail)
         out.append("```")
+        out.append("")
+
+    # ── Skill catalog on-ramp ──────────────────────────────────────────
+    # Once per project, and only when the CLI is actually installed.
+    # Placed last-but-one so it never buries the proposal below.
+    onramp = catalog_onramp()
+    if onramp:
+        out.append(onramp)
         out.append("")
 
     # ── Proposal ───────────────────────────────────────────────────────
