@@ -8,11 +8,12 @@ Three tracks, changed-files-only:
     TODO/FIXME markers, stale time-sensitive phrases
   - AI slop prompt: returned in the report for the agent to action
 
-On zero-blocker pass, hands off to
-${OPENCLAW_WORKSPACE_DIR}/scripts/clean-finalize.sh, which writes the
-sentinel ${OPENCLAW_WORKSPACE_DIR}/.state/clean-ok-<hash> AND emits the
-upstream-contribute nudge to stderr. The pre-commit-gate hook reads
-this sentinel.
+On zero-blocker pass, hands off to <workspace>/scripts/clean-finalize.sh,
+which writes the sentinel <workspace>/.state/clean-ok-<hash> AND emits
+the upstream-contribute nudge to stderr. The pre-commit-gate hook reads
+this sentinel. <workspace> (the .codex/ tree) is self-located from this
+file's path (see resolve_workspace_dir()); no environment variable is
+required or consulted.
 
 Exit codes:
   0  zero blockers (sentinel written)
@@ -32,6 +33,39 @@ import sys
 
 def run(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def resolve_workspace_dir():
+    """Resolve the `.codex` workspace root (hooks/scripts/.state) that
+    this audit hands off to.
+
+    Every bash hook/script in this harness self-locates
+    (`ROOT="$(cd "$(dirname "$0")/.." && pwd)"`) from its own file path —
+    never from an environment variable. audit.py was the one holdout
+    that *required* OPENCLAW_WORKSPACE_DIR: nothing in this repo (or an
+    installed project) ever sets it, so a plain shell made $clean
+    impossible to unblock even by following pre-commit-gate.sh's own
+    remediation command verbatim (ported from Rockielab/rockie-claude#24
+    bug 1).
+
+    This repo splits the install in two: skills (including this file)
+    land in <project>/.agents/skills/, while hooks/scripts/.state land
+    in the SIBLING <project>/.codex/ — unlike rockie-claude, where
+    everything installs under one .claude/ tree. So self-location here
+    is "go up to the project root, then into .codex", not "go up to my
+    own root": audit.py lives at <project>/.agents/skills/clean/audit.py,
+    four path segments below <project>.
+
+    An env-var override was deliberately NOT ported back in either: a
+    stale value (e.g. left set from a previous session, pointing at a
+    sibling checkout) would silently redirect the sentinel to the WRONG
+    .codex/.state — this bites hardest in a `git worktree add` checkout,
+    where .state/ is gitignored and so never copied between worktrees
+    (same rockie-claude#24 bug 1, worktree manifestation). No other
+    script in this harness supports such an override and nothing sets
+    the var, so it would be pure risk with no upside.
+    """
+    return str(pathlib.Path(__file__).resolve().parents[3] / ".codex")
 
 
 def changed_files(scope, since=None):
@@ -98,8 +132,18 @@ def audit_markdown(f, is_new, repo_root):
     issues = []
     # Block creation of new .md files — user's rule for this repo.
     # Exempt: harness infrastructure (.codex/** legacy or .openclaw/**)
-    # where .md files are skill/agent definitions required to exist.
-    if is_new and not (f.startswith(".codex/") or f.startswith(".openclaw/")):
+    # where .md files are skill/agent definitions required to exist, AND
+    # the repo-root AGENTS.md itself. install.sh's own bootstrap
+    # instructions tell every new user to `cp agents-md/AGENTS.md.template
+    # AGENTS.md` as their first action after installing — $clean blocking
+    # that made the harness reject the very first commit it told the user
+    # to make (ported from Rockielab/rockie-claude#24 bug 2). AGENTS.md is
+    # a singular, harness-mandated config file at a fixed path, not the
+    # arbitrary doc proliferation this rule targets — unlike a new
+    # NOTES.md/REPORT.md, there is only ever one. Other canonical root
+    # docs are out of scope for this fix; only the reported file is
+    # exempted.
+    if is_new and f != "AGENTS.md" and not (f.startswith(".codex/") or f.startswith(".openclaw/")):
         issues.append((
             f, "blocker",
             "NEW .md file. Repo convention: consolidate into existing docs. "
@@ -149,10 +193,7 @@ def audit_markdown(f, is_new, repo_root):
 
 
 def compute_hash():
-    ws = os.environ.get("OPENCLAW_WORKSPACE_DIR")
-    if not ws:
-        print("compute_hash: OPENCLAW_WORKSPACE_DIR unset", file=sys.stderr)
-        sys.exit(2)
+    ws = resolve_workspace_dir()
     r = run(["bash", f"{ws}/scripts/compute_clean_hash.sh"])
     return r.stdout.strip()
 
@@ -225,10 +266,7 @@ def main():
             # clean-finalize.sh so the nudge is deterministic (not
             # prose-only in SKILL.md) and the sentinel format stays in
             # one place shared with pre-commit-gate.sh.
-            ws = os.environ.get("OPENCLAW_WORKSPACE_DIR")
-            if not ws:
-                print("clean: OPENCLAW_WORKSPACE_DIR unset", file=sys.stderr)
-                sys.exit(2)
+            ws = resolve_workspace_dir()
             r = subprocess.run(
                 ["bash", f"{ws}/scripts/clean-finalize.sh", h],
                 text=True,
