@@ -22,6 +22,11 @@
 #   • FTS5 hyphen-as-NOT-operator documented + tested
 #   • Skill catalog on-ramp: silent with no CLI, once-per-project with one,
 #     never shells out at SessionStart (fake rockie — no network/auth)
+#   • Installed-skills inventory: renders every SessionStart (incl. the
+#     compact source, since the hook carries no matcher), reads from
+#     .agents/skills (not .claude/skills), falls back cleanly on
+#     missing/malformed SKILL.md, skips skill dirs with none, silently
+#     no-ops with no .agents/skills dir, caps large counts at 40
 #
 # Exits 0 on success, 1 on first failing assertion.
 set -u
@@ -1007,6 +1012,105 @@ if grep -q 'find-skills' "$ROCKIE/agents-md/AGENTS.md.template" \
 else
   fail "AGENTS.md templates missing the skill-catalog on-ramp"
 fi
+
+# ── Installed skills inventory (post-compaction rediscovery) ─────────────
+# SessionStart in this harness carries no `matcher`, so it fires on every
+# source Codex emits — startup, resume, clear, AND compact (see
+# hooks/session-report.sh's own comment on this). One fixture therefore
+# covers both "plain session start" and "after /compact": if the section
+# renders here, it renders post-compaction too — there is no separate
+# code path to test.
+section "installed skills inventory"
+
+SKILLS_PROJ=$(mktemp -d -t smoke-skills-XXXXXX)
+mkdir -p "$SKILLS_PROJ/.codex/scripts"
+cp "$ROCKIE/project-extension/codex/scripts/session_report.py" "$SKILLS_PROJ/.codex/scripts/session_report.py"
+
+mkdir -p "$SKILLS_PROJ/.agents/skills/well-formed"
+cat > "$SKILLS_PROJ/.agents/skills/well-formed/SKILL.md" <<'EOF'
+---
+name: well-formed
+description: A normal skill with a clean frontmatter description line.
+---
+
+# well-formed
+Body text.
+EOF
+
+# Malformed frontmatter: opens but never closes, and has no description
+# key — only prose follows. Must fall back to the first prose line
+# rather than crash the report or leak a raw YAML/fence line as the
+# "description".
+mkdir -p "$SKILLS_PROJ/.agents/skills/malformed-frontmatter"
+cat > "$SKILLS_PROJ/.agents/skills/malformed-frontmatter/SKILL.md" <<'EOF'
+---
+name: malformed-frontmatter
+
+Some prose line that should be picked up as the fallback description.
+EOF
+
+# No frontmatter at all — just prose. name falls back to the dir name,
+# description falls back to the first non-empty line in the file.
+mkdir -p "$SKILLS_PROJ/.agents/skills/no-frontmatter"
+cat > "$SKILLS_PROJ/.agents/skills/no-frontmatter/SKILL.md" <<'EOF'
+# no-frontmatter
+
+This skill ships with no YAML frontmatter block whatsoever.
+EOF
+
+# Skill dir with no SKILL.md at all — must be skipped silently, not fail.
+mkdir -p "$SKILLS_PROJ/.agents/skills/no-skill-md/scripts"
+echo "print('hi')" > "$SKILLS_PROJ/.agents/skills/no-skill-md/scripts/helper.py"
+
+SKILLS_OUT=$(python3 "$SKILLS_PROJ/.codex/scripts/session_report.py" 2>&1)
+
+assert "installed skills section renders" \
+  "1" "$(printf '%s' "$SKILLS_OUT" | grep -c '## Installed skills')"
+assert "well-formed skill shows its frontmatter description" \
+  "1" "$(printf '%s' "$SKILLS_OUT" | grep -c 'well-formed\*\* — A normal skill with a clean frontmatter')"
+assert "malformed-frontmatter skill falls back to first prose line, no raw fence/YAML leaked" \
+  "1" "$(printf '%s' "$SKILLS_OUT" | grep -c 'malformed-frontmatter\*\* — Some prose line that should be picked up')"
+assert "no-frontmatter skill falls back to dir name + first line" \
+  "1" "$(printf '%s' "$SKILLS_OUT" | grep -c 'no-frontmatter\*\* — no-frontmatter')"
+assert "no-skill-md dir is skipped, not listed" \
+  "0" "$(printf '%s' "$SKILLS_OUT" | grep -c 'no-skill-md')"
+assert "nudge to browse the relevant SKILL.md is present" \
+  "1" "$(printf '%s' "$SKILLS_OUT" | grep -c 'Browse the relevant SKILL.md before starting matching work')"
+rm -rf "$SKILLS_PROJ"
+
+# Missing .agents/skills/ dir entirely — silent skip, no crash, no empty header.
+NOSKILLS_PROJ=$(mktemp -d -t smoke-noskills-XXXXXX)
+mkdir -p "$NOSKILLS_PROJ/.codex/scripts"
+cp "$ROCKIE/project-extension/codex/scripts/session_report.py" "$NOSKILLS_PROJ/.codex/scripts/session_report.py"
+NOSKILLS_OUT=$(python3 "$NOSKILLS_PROJ/.codex/scripts/session_report.py" 2>&1); NOSKILLS_RC=$?
+assert "missing .agents/skills/ dir: session report still exits 0" "0" "$NOSKILLS_RC"
+assert "missing .agents/skills/ dir: no Installed skills section emitted" \
+  "0" "$(printf '%s' "$NOSKILLS_OUT" | grep -c '## Installed skills')"
+rm -rf "$NOSKILLS_PROJ"
+
+# Large count: cap at 40 with a "+N more" line rather than growing unbounded.
+CAP_PROJ=$(mktemp -d -t smoke-skillscap-XXXXXX)
+mkdir -p "$CAP_PROJ/.codex/scripts"
+cp "$ROCKIE/project-extension/codex/scripts/session_report.py" "$CAP_PROJ/.codex/scripts/session_report.py"
+for i in $(seq -w 1 45); do
+  d="$CAP_PROJ/.agents/skills/fixture-skill-$i"
+  mkdir -p "$d"
+  cat > "$d/SKILL.md" <<EOF
+---
+name: fixture-skill-$i
+description: Fixture skill number $i for the cap test.
+---
+Body.
+EOF
+done
+CAP_OUT=$(python3 "$CAP_PROJ/.codex/scripts/session_report.py" 2>&1)
+assert "45 skills: header reports the true total of 45" \
+  "1" "$(printf '%s' "$CAP_OUT" | grep -c '## Installed skills (45)')"
+assert "45 skills: '+5 more' overflow line present" \
+  "1" "$(printf '%s' "$CAP_OUT" | grep -c '+5 more')"
+LISTED_COUNT=$(printf '%s' "$CAP_OUT" | awk '/## Installed skills/{flag=1;next} flag && /^## /{flag=0} flag' | grep -c '^- \*\*fixture-skill-')
+assert "45 skills: list itself capped at 40 lines" "40" "$LISTED_COUNT"
+rm -rf "$CAP_PROJ"
 
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
