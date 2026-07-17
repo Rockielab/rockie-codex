@@ -569,6 +569,12 @@ rm -f "$PROJ/AGENTS.md" "$PROJ/RANDOM_DOC.md" "$PROJ"/.codex/.state/clean-ok-*
 WTBASE=$(mktemp -d -t rockie-worktree-XXXXXX)
 mkdir -p "$WTBASE/main/.codex" "$WTBASE/main/.agents/skills"
 (cd "$WTBASE/main" && git init -q)
+# Local identity for this throwaway repo — CI runners have no global git
+# config, and the real `git commit` a few lines down (unlike the rest of
+# this suite, which only feeds JSON to hooks) needs one or fails with
+# "empty ident name", which cascades into `git worktree add` never
+# creating $WTBASE/wt and four unrelated assertion failures below.
+(cd "$WTBASE/main" && git config user.email "smoke@rockie.test" && git config user.name "rockie smoke test")
 rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/codex/" "$WTBASE/main/.codex/" >/dev/null
 rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/agents/skills/" "$WTBASE/main/.agents/skills/" >/dev/null
 chmod +x "$WTBASE/main/.codex/hooks/"*.sh "$WTBASE/main/.codex/scripts/"*.sh 2>/dev/null
