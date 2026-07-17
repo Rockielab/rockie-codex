@@ -21,6 +21,52 @@ Every cycle should make the next cycle better.
 - **Assess:** Be honest. Negative results are data. Don't spin.
 - **Codify:** Update `STATE.md` and `EXPERIMENT_LOG.md`. If you learned a lesson, emit a `[LEARN]` block so it auto-saves to the learnings DB.
 
+## Operating Doctrine (for sustained, multi-day campaigns)
+
+The `autoresearch` skill (`.agents/skills/autoresearch/SKILL.md`)
+encodes the loop that enforces these; both travel with the project.
+
+- **One spearhead.** Pick the single result the campaign is actually
+  for — the flagship experiment — and treat everything else as support
+  or queue filler. A campaign with two co-equal priorities makes
+  neither one land.
+- **Concurrent pipeline.** Past a single experiment, never run
+  sequentially: RUN the live experiment; PLAN the next one with every
+  WIN/PARTIAL/NULL branch pre-specified and pre-attacked so the
+  winning branch launches the same day the current verdict lands;
+  WRITE UP the previous result with an explicit pending slot for the
+  current one. Zero idle gap between a verdict and the next launch.
+- **Utilization, not occupancy.** If you're paying for a GPU — a
+  spot-rented instance or a fixed uptime-metered box — idle time is
+  wasted money either way. Sample utilization periodically; sustained
+  low utilization on a GPU you're actively paying for is a bug to
+  diagnose, not background noise. Saturation-packing (predicting SM
+  utilization + memory per cell, then packing small cells N-per-GPU
+  with a contention-priced ceiling instead of running each alone) is a
+  pre-launch design decision, not an afterthought.
+- **Research grounding.** Every design, claim, and report cites
+  VERIFIED literature — a research agent confirms author, venue, and
+  actual claim by web search before a citation enters any doc; the
+  coordinator spot-checks load-bearing claims (e.g. fetches the
+  abstract) before folding them in. Novelty is a searched absence,
+  never an assumed one.
+- **Novelty re-verification gate.** A novelty check done once at
+  design time goes stale the moment the claim moves. Re-run it before
+  every launch AND at every claim pivot — a reframed headline is a new
+  claim even when the experiment underneath is unchanged, because the
+  literature it now competes in has changed. See the autoresearch
+  skill's gate section for the full triple-sweep protocol (external
+  by-task, external by-mechanism, internal-archive).
+- **Ceremony tiers.** Ceremony scales with compute committed: under 10
+  GPU-hours gets one audit round; 10–50 GPU-hours gets audit plus a
+  dedicated resource/placement red-team; over 50 GPU-hours, or
+  anything publication-bound, gets a full multi-round adversarial
+  gauntlet.
+- **Model tiering.** Worker subagents (research scouts, design
+  drafters, runners) use the cheaper/faster model tier. Judges, attack
+  rounds, and blind assessors use the strongest available tier —
+  they're the check on everything else.
+
 ## Learnings DB
 
 A SQLite DB at `.codex/memory/workflow.db` persists durable rules, corrections, and gotchas across sessions. Relevant rules auto-inject at prompt time via the `load-relevant-rules.sh` hook.

@@ -1,6 +1,6 @@
 ---
 name: autoresearch
-description: Canonical around-the-clock research loop. Defines the agent's outer loop — read taste corpus + queue, pick the next experiment, mutate the explicitly-declared mutation surface, run the experiment under a hard time budget against a frozen metric, score, codify, repeat. Augmented with Karpathy's sharp primitives (frozen metric, time cap, explicit mutation surface).
+description: Canonical around-the-clock research loop. Defines the agent's outer loop — read taste corpus + queue, pick the next experiment, mutate the explicitly-declared mutation surface, run the experiment under a hard time budget against a frozen metric, score, codify, repeat. Augmented with Karpathy's sharp primitives (frozen metric, time cap, explicit mutation surface) and a sustained-campaign layer (concurrent run/plan/write-up pipeline, verdict protocol, novelty re-verification gate) for multi-day operations.
 ---
 
 # autoresearch
@@ -12,7 +12,13 @@ The bones of this skill predate Karpathy's autoresearch (rockie's
 existing autopilot + queue + post-run-review primitives are richer than
 Karpathy's narrow loop). Phase 7 augmented those bones with three
 sharp Karpathy primitives — frozen metric, time-budget per experiment,
-explicit mutation surface — without stripping the broader system.
+explicit mutation surface — without stripping the broader system. A
+later pass added the sustained-campaign layer below (concurrent
+pipeline staffing, the verdict protocol, subagent tiering, the
+pre-launch resource/placement red-team, and the novelty
+re-verification gate) — the operating discipline that keeps a
+multi-day, multi-experiment campaign honest once a single queue row
+stops being the unit of work.
 
 ## When to invoke
 
@@ -171,6 +177,110 @@ EXP_ID=$(.agents/skills/autoresearch/scripts/start.sh QUEUE_ID)
   the SOUL/STYLE/METHODOLOGY corpus (rockie convention) MUST be loaded
   into the agent's context every iteration. Without taste, you get
   technically-correct-but-research-garbage output.
+
+## Concurrent pipeline staffing (sustained, multi-day campaigns)
+
+The canonical loop above is the per-experiment micro-loop. Once a
+campaign runs for days rather than a single queue row, staff three
+roles at once — never sequentially, never idle between them:
+
+- **RUN N** — the live experiment executing right now. Poll it BLIND
+  (see Verdict protocol below).
+- **PLAN N+1** — a design pass drafting the next experiment with every
+  WIN / PARTIAL / NULL branch of N pre-specified AND pre-attacked, so
+  the winning branch can launch the same day N's verdict is recorded.
+  Zero idle gap between a verdict landing and the next launch.
+- **WRITE UP N−1** — a write-up pass for the previous result, carrying
+  an explicit pending slot for N's verdict.
+
+Use this once the queue has more than one experiment in flight across
+more than a day of wall-clock; for a single short experiment the
+canonical loop above is sufficient on its own.
+
+## Verdict protocol (never shortcut this)
+
+- Runs are BLIND: runners and pollers report structure only — did it
+  crash, how many cells finished, error greps — never metric values,
+  before the assess stage.
+- On completion, dispatch a FRESH assess agent (judge-tier model, no
+  narrative memory of the run) that applies bands FROZEN before the
+  run started to the raw artifacts.
+- RECORD FIRST: write the verdict to the experiment/design record
+  BEFORE any dependent stage dispatches and before it's surfaced to
+  the researcher.
+- The coordinator then cross-checks the recorded verdict against the
+  raw files itself. If two rounds make conflicting claims about the
+  same artifact, read the raw artifact directly and record the
+  tiebreak — never average, split the difference, or default to the
+  more recent claim.
+- Surface the verdict first, with honest odds, no spin. Never
+  fabricate dates or results.
+
+## Subagent tiering
+
+Workers (research scouts, design drafters, write-up agents, runners)
+use the cheaper/faster model tier. Judges, attack rounds, and blind
+assessors use the strongest available tier — they're the check on
+everything else, so under-provisioning them defeats the point. See
+the `prefer_opus_for` / `prefer_sonnet_for` fields on the `[workflow]`
+table in `.agents/skills/mode/SKILL.md` for rockie's own default split
+(workhorse tier for research/fix-application, top tier for
+attack/novelty-check/high-risk calls).
+
+## Pre-launch resource/placement red-team
+
+Every GPU-committing launch gets an adversarial pass before it burns a
+dollar: does the workload actually fit the target hardware (predicted
+utilization + memory, not a guess)? Is the timeout realistic at the
+measured rate? Is this a duplicate of a run already in flight? Is
+there an undischarged gate blocking this launch?
+
+**Ceremony scales with compute committed, not with excitement:**
+
+| Compute committed | Ceremony |
+|---|---|
+| < 10 GPU-hours | 1 audit round |
+| 10–50 GPU-hours | audit + a dedicated resource/placement red-team pass |
+| > 50 GPU-hours, or anything publication-bound | full multi-round adversarial gauntlet |
+
+**Utilization, not occupancy.** If you're paying for a GPU — spot-rented
+or a fixed uptime-metered box — idle time is wasted money either way.
+Sample utilization periodically; sustained low utilization on a GPU
+you're actively paying for is a bug to diagnose, not background noise
+(fix with exact tmux-session names or exact PIDs — see the `ops`
+seeds in `examples/seed_example_ml_research.py` for the remote-box
+`pkill -f` trap this rules out). Saturation-packing — predicting SM
+utilization and memory footprint per cell, then packing several small
+cells onto one GPU with a contention-priced ceiling instead of running
+each alone at low utilization — is a pre-launch design decision, not
+an afterthought.
+
+## Novelty re-verification gate
+
+A novelty check done once at design time goes stale the moment the
+claim moves. Re-run it BEFORE every launch and at every CLAIM PIVOT —
+a reframed headline is a NEW claim even when the experiment underneath
+is unchanged, because the literature it now competes in has changed
+(a reframed claim can land in a far more crowded literature than the
+one it was first checked against — same experiment, different
+competing field).
+
+The gate, triple-sworn:
+
+1. **External sweep, by-TASK angle** (worker agent, web-verified): who
+   has run this task family / protocol, in what train-test regime?
+2. **External sweep, by-MECHANISM angle** (independent worker agent):
+   who has built this mechanism or claimed this property? Hunt
+   specifically for publications after the last check.
+3. **Internal-archive sweep** (worker agent, read-only): does your own
+   experiment log, dead-end registry, and design history already
+   contain, constrain, or contradict the planned cells or claim?
+
+Both external agents are prompted ADVERSARIALLY ("find the scoop") and
+must return a kill-question verdict plus the narrowest honest unclaimed
+statement. A judge-tier agent (mandatory for publication-bound claims)
+adjudicates all three, records the verdict in the relevant design doc
+or research memo, and only then lets the dependent stage proceed.
 
 ## Schema additions (migration 005)
 
