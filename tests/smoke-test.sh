@@ -32,7 +32,7 @@ SQLITE=/usr/bin/sqlite3
 ROCKIE="$(cd "$(dirname "$0")/.." && pwd)"
 WORK=$(mktemp -d -t rockie-codex-smoke-XXXXXX)
 # Clean up any per-test tempdirs that escape the main WORK; set a broad trap.
-trap 'rm -rf "$WORK"; rm -rf /tmp/rockie-autopilot-* /tmp/rockie-migration-* /tmp/smoke-merge-* /tmp/smoke-idem-* /tmp/smoke-catalog-* 2>/dev/null' EXIT
+trap 'rm -rf "$WORK"; rm -rf /tmp/rockie-autopilot-* /tmp/rockie-migration-* /tmp/smoke-merge-* /tmp/smoke-idem-* /tmp/smoke-catalog-* /tmp/rockie-worktree-* 2>/dev/null' EXIT
 
 PASS=0
 FAIL=0
@@ -367,6 +367,7 @@ python3 "$PROJ/.codex/scripts/apply_patch.py" < "$WORK/patch.abs" >/dev/null 2>&
 section "dry-run gate"
 mkdir -p "$PROJ/src"
 cat > "$PROJ/src/train.py" <<EOF
+import torch
 print("v1")
 EOF
 bash "$PROJ/.codex/scripts/dry_run_gate.sh" register "$PROJ/src/train.py" >/dev/null
@@ -381,6 +382,29 @@ assert "dry-run-gate: modified script → block (exit 2)" "2" "$?"
 IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 src/train.py --smoke','cwd':'$PROJ'}}))")
 echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
 assert "dry-run-gate: --smoke bypass" "0" "$?"
+
+# pre-train-gate must narrow to real training/eval entry points (ported
+# from Rockielab/rockie-claude#24 bug 3) — it previously fired on ANY
+# `python3 <file>.py`, including the harness's own skills/clean/audit.py
+# (a lint script), demanding a "forward+backward+grad check" dry run for
+# a linter.
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 .agents/skills/clean/audit.py --scope staged','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: non-training utility script (audit.py) passes without a dry-run sentinel" "0" "$?"
+
+cat > "$PROJ/src/real_train.py" <<'EOF'
+import torch
+model = torch.nn.Linear(4, 4)
+loss = model(torch.randn(4)).sum()
+loss.backward()
+EOF
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 src/real_train.py','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: real training script (torch + backward) still blocked without a sentinel" "2" "$?"
+
+bash "$PROJ/.codex/scripts/dry_run_gate.sh" register "$PROJ/src/real_train.py" >/dev/null
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: real training script passes once dry-run sentinel registered" "0" "$?"
 
 # ── 14. Pre-commit gate (clean hash) ─────────────────────────────────────
 section "pre-commit gate"
@@ -410,6 +434,75 @@ echo "$NUDGE_OUT" | grep -q 'saml212/rockie-codex' && ok "clean-finalize: nudge 
 [ -n "$NUDGE_OUT" ] && ok "clean-finalize: stderr nudge is non-empty" || fail "clean-finalize: stderr empty"
 bash "$PROJ/.codex/scripts/clean-finalize.sh" >/dev/null 2>&1
 assert "clean-finalize: missing hash arg → exit 2" "2" "$?"
+
+# ── Regression coverage ported from Rockielab/rockie-claude#24 ──────────
+section "clean audit: env-var-free + AGENTS.md bootstrap (rockie-claude#24)"
+
+# Bug 1: pre-commit-gate's own remediation text is
+# `python3 .agents/skills/clean/audit.py --scope staged` — no env vars.
+# Running that exact command in a plain shell with OPENCLAW_WORKSPACE_DIR
+# unset must not be a catch-22.
+echo "friction check" > "$PROJ/friction_check.txt"
+(cd "$PROJ" && git add friction_check.txt)
+(cd "$PROJ" && env -u OPENCLAW_WORKSPACE_DIR -u OPENCLAW_SKILLS_DIR python3 .agents/skills/clean/audit.py --scope staged >/dev/null 2>&1)
+assert "clean audit.py: documented remediation command exits 0 with no env vars set" "0" "$?"
+
+HASH2=$(cd "$PROJ" && bash .codex/scripts/compute_clean_hash.sh)
+[ -f "$PROJ/.codex/.state/clean-ok-$HASH2" ] && ok "clean audit.py: sentinel written without OPENCLAW_* env vars" || fail "clean audit.py: sentinel missing after env-var-free run"
+
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'git commit -m x','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-commit-gate.sh" >/dev/null 2>&1
+assert "pre-commit-gate: sentinel from the env-var-free audit.py run unblocks the commit" "0" "$?"
+rm -f "$PROJ"/.codex/.state/clean-ok-*
+
+# Bug 2: install.sh's own bootstrap instructions tell a new user to
+# `cp agents-md/AGENTS.md.template AGENTS.md` as their first action.
+# $clean must not block that sanctioned file, while still blocking an
+# arbitrary new .md file (the anti-slop rule itself must stay intact).
+cp "$ROCKIE/agents-md/AGENTS.md.template" "$PROJ/AGENTS.md"
+echo "some notes" > "$PROJ/RANDOM_DOC.md"
+(cd "$PROJ" && git add AGENTS.md RANDOM_DOC.md)
+BOOTSTRAP_OUT=$(cd "$PROJ" && python3 .agents/skills/clean/audit.py --scope staged 2>&1)
+echo "$BOOTSTRAP_OUT" | grep -q '\[AGENTS\.md\]' && fail "clean audit.py: bootstrap AGENTS.md still flagged as a new-.md blocker" || ok "clean audit.py: bootstrap AGENTS.md exempt from the new-.md blocker"
+echo "$BOOTSTRAP_OUT" | grep -q '\[RANDOM_DOC\.md\].*NEW \.md file' && ok "clean audit.py: anti-slop new-.md rule still blocks an arbitrary new doc" || fail "clean audit.py: new-.md rule regressed for non-AGENTS.md files"
+(cd "$PROJ" && git reset -q AGENTS.md RANDOM_DOC.md)
+rm -f "$PROJ/AGENTS.md" "$PROJ/RANDOM_DOC.md" "$PROJ"/.codex/.state/clean-ok-*
+
+# Bug 1, worktree manifestation: `.codex/.state/` is gitignored, so
+# `git worktree add` does NOT copy it — each worktree starts with its own
+# empty `.state/`. audit.py must self-locate to THAT worktree's own
+# `.codex`, not a sibling checkout's, even if OPENCLAW_WORKSPACE_DIR is
+# left set (stale) from a previous session.
+WTBASE=$(mktemp -d -t rockie-worktree-XXXXXX)
+mkdir -p "$WTBASE/main/.codex" "$WTBASE/main/.agents/skills"
+(cd "$WTBASE/main" && git init -q)
+rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/codex/" "$WTBASE/main/.codex/" >/dev/null
+rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/agents/skills/" "$WTBASE/main/.agents/skills/" >/dev/null
+chmod +x "$WTBASE/main/.codex/hooks/"*.sh "$WTBASE/main/.codex/scripts/"*.sh 2>/dev/null
+(cd "$WTBASE/main" && git add -A >/dev/null && git commit -q -m init >/dev/null)
+(cd "$WTBASE/main" && git worktree add -q -b wt-feature "$WTBASE/wt" >/dev/null 2>&1)
+
+echo "wt change" > "$WTBASE/wt/wtfile.txt"
+(cd "$WTBASE/wt" && git add wtfile.txt)
+(cd "$WTBASE/wt" && env -u OPENCLAW_WORKSPACE_DIR -u OPENCLAW_SKILLS_DIR python3 .agents/skills/clean/audit.py --scope staged >/dev/null 2>&1)
+assert "clean audit.py: passes inside a git-worktree checkout" "0" "$?"
+
+WT_HASH=$(cd "$WTBASE/wt" && bash .codex/scripts/compute_clean_hash.sh)
+[ -f "$WTBASE/wt/.codex/.state/clean-ok-$WT_HASH" ] && ok "clean audit.py: sentinel lands in the worktree's own .state" || fail "clean audit.py: sentinel missing from the worktree's .state"
+
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'git commit -m x','cwd':'$WTBASE/wt'}}))")
+echo "$IN" | bash "$WTBASE/wt/.codex/hooks/pre-commit-gate.sh" >/dev/null 2>&1
+assert "pre-commit-gate: worktree commit unblocked by the worktree's own sentinel" "0" "$?"
+
+# A stale OPENCLAW_WORKSPACE_DIR pointed at the main checkout must not
+# redirect the sentinel there instead of the worktree.
+echo "wt change 2" >> "$WTBASE/wt/wtfile.txt"
+(cd "$WTBASE/wt" && git add wtfile.txt)
+(cd "$WTBASE/wt" && OPENCLAW_WORKSPACE_DIR="$WTBASE/main/.codex" python3 .agents/skills/clean/audit.py --scope staged >/dev/null 2>&1)
+WT_HASH2=$(cd "$WTBASE/wt" && bash .codex/scripts/compute_clean_hash.sh)
+[ -f "$WTBASE/wt/.codex/.state/clean-ok-$WT_HASH2" ] && ok "clean audit.py: ignores a stale OPENCLAW_WORKSPACE_DIR pointed at a sibling checkout" || fail "clean audit.py: stale OPENCLAW_WORKSPACE_DIR redirected the sentinel away from the worktree"
+[ ! -f "$WTBASE/main/.codex/.state/clean-ok-$WT_HASH2" ] && ok "clean audit.py: did not leak the sentinel into the main checkout's .state" || fail "clean audit.py: sentinel incorrectly written into main checkout"
+rm -rf "$WTBASE"
 
 # ── 15. FTS5 hyphen-safety note ──────────────────────────────────────────
 section "installer hooks merge"
@@ -467,6 +560,7 @@ bash "$APC/.codex/scripts/autopilot_loop.sh" 2>&1 | grep -q 'not in allow-list' 
 section "pre-train-gate bypass attempts"
 mkdir -p "$PROJ/src-py311"
 cat > "$PROJ/src-py311/train.py" <<'EOF'
+import torch
 print("v1")
 EOF
 bash "$PROJ/.codex/scripts/dry_run_gate.sh" register "$PROJ/src-py311/train.py" >/dev/null
