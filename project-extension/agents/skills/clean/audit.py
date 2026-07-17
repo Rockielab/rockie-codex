@@ -133,17 +133,27 @@ def audit_markdown(f, is_new, repo_root):
     # Block creation of new .md files — user's rule for this repo.
     # Exempt: harness infrastructure (.codex/** legacy or .openclaw/**)
     # where .md files are skill/agent definitions required to exist, AND
-    # the repo-root AGENTS.md itself. install.sh's own bootstrap
-    # instructions tell every new user to `cp agents-md/AGENTS.md.template
-    # AGENTS.md` as their first action after installing — $clean blocking
-    # that made the harness reject the very first commit it told the user
-    # to make (ported from Rockielab/rockie-claude#24 bug 2). AGENTS.md is
-    # a singular, harness-mandated config file at a fixed path, not the
-    # arbitrary doc proliferation this rule targets — unlike a new
-    # NOTES.md/REPORT.md, there is only ever one. Other canonical root
-    # docs are out of scope for this fix; only the reported file is
-    # exempted.
-    if is_new and f != "AGENTS.md" and not (f.startswith(".codex/") or f.startswith(".openclaw/")):
+    # the handful of root-level docs the harness itself mandates:
+    # AGENTS.md (install.sh's own bootstrap tells every new user to
+    # `cp agents-md/AGENTS.md.template AGENTS.md` as their first action
+    # after installing — ported from Rockielab/rockie-claude#24 bug 2),
+    # plus README.md/STATE.md/EXPERIMENT_LOG.md (the generated AGENTS.md
+    # itself instructs every project to maintain STATE.md and
+    # EXPERIMENT_LOG.md at repo root, and every repo needs a README —
+    # same dogfooding bug backported from Rockielab/rockie-claude, this
+    # time caught on the AGENTS.md side before it shipped). These are
+    # singular, harness-mandated files at a fixed repo-root path, not
+    # the arbitrary doc proliferation this rule targets — unlike a new
+    # NOTES.md/REPORT.md, or any .md nested in a subdirectory, there is
+    # only ever one of each, always at repo root. The exemption is
+    # root-only by construction: a nested docs/STATE.md or docs/README.md
+    # doesn't match the bare filename and still blocks.
+    ROOT_MANDATED_MD = {"AGENTS.md", "README.md", "STATE.md", "EXPERIMENT_LOG.md"}
+    if (
+        is_new
+        and f not in ROOT_MANDATED_MD
+        and not (f.startswith(".codex/") or f.startswith(".openclaw/"))
+    ):
         issues.append((
             f, "blocker",
             "NEW .md file. Repo convention: consolidate into existing docs. "
