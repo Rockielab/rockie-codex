@@ -28,7 +28,7 @@ encodes the loop that enforces these; both travel with the project.
 
 - **One spearhead.** Pick the single result the campaign is actually
   for — the flagship experiment — and treat everything else as support
-  or queue filler. A campaign with two co-equal priorities makes
+  or backlog filler. A campaign with two co-equal priorities makes
   neither one land.
 - **Concurrent pipeline.** Past a single experiment, never run
   sequentially: RUN the live experiment; PLAN the next one with every
@@ -37,7 +37,7 @@ encodes the loop that enforces these; both travel with the project.
   WRITE UP the previous result with an explicit pending slot for the
   current one. Zero idle gap between a verdict and the next launch.
 - **Utilization, not occupancy.** If you're paying for a GPU — a
-  spot-rented instance or a fixed uptime-metered box — idle time is
+  spot-rented instance or a reserved box on a fixed compute window — idle time is
   wasted money either way. Sample utilization periodically; sustained
   low utilization on a GPU you're actively paying for is a bug to
   diagnose, not background noise. Saturation-packing (predicting SM

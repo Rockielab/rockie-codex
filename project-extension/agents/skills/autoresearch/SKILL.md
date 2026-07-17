@@ -244,7 +244,7 @@ there an undischarged gate blocking this launch?
 | > 50 GPU-hours, or anything publication-bound | full multi-round adversarial gauntlet |
 
 **Utilization, not occupancy.** If you're paying for a GPU — spot-rented
-or a fixed uptime-metered box — idle time is wasted money either way.
+or a reserved box on a fixed compute window — idle time is wasted money either way.
 Sample utilization periodically; sustained low utilization on a GPU
 you're actively paying for is a bug to diagnose, not background noise
 (fix with exact tmux-session names or exact PIDs — see the `ops`
@@ -261,7 +261,7 @@ A novelty check done once at design time goes stale the moment the
 claim moves. Re-run it BEFORE every launch and at every CLAIM PIVOT —
 a reframed headline is a NEW claim even when the experiment underneath
 is unchanged, because the literature it now competes in has changed
-(a reframed claim can land in a far more crowded literature than the
+(a reframed claim can land in a more crowded literature than the
 one it was first checked against — same experiment, different
 competing field).
 
