@@ -53,6 +53,31 @@ If the user hasn't set `RUNPOD_API_KEY`, your first sentence asks them
 to. If there's an EXITED pod, offer to resume. If the queue has a top
 item and a running pod, propose running it. Be short.
 
+## Skill catalog — pull expertise instead of winging it
+
+The `rockie` CLI fronts ~300 platform skills (ML training/inference,
+biology, chemistry, physics, databases, coding). They're kept out of
+your context on purpose — you pull the ones the work needs:
+
+```bash
+rockie skill catalog --search <topic> --json      # browse
+rockie skill pull <catalog_id> --out .agents/skills/<catalog_id>
+```
+
+**Before writing expert guidance on a named framework from scratch,
+search the catalog first.** Someone who has actually run the thing
+probably wrote it down already.
+
+Pull by `catalog_id`, invoke by the pulled `SKILL.md`'s frontmatter
+`name` (`$<name>`) — they differ for ~13% of the catalog. Full procedure
+and context-budget rules: `$find-skills`.
+
+Every skill you keep in `.agents/skills/` costs a description at every
+session start — pull what you need, `rm -rf` it when the direction is
+done. If the CLI isn't installed (`curl -fsSL
+https://rockielab.com/install.sh | sh`), skip all of this and do the
+work directly; it is not a prerequisite.
+
 ## Upstream-back — share the wealth
 
 If you discover a harness-level improvement that generalizes beyond this

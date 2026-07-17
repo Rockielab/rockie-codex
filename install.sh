@@ -237,5 +237,29 @@ Optional: install dashboard dependencies for the `deploy-team-dashboard` skill:
 EOF
 fi
 
+# ── Skill catalog on-ramp ────────────────────────────────────────────────
+# The catalog is the harness's central idea: ~300 skills stay OUT of the
+# agent's context and get pulled on demand. Say so here, at the one moment
+# we know an agent (or human) is looking at this terminal. Both branches
+# are non-blocking and fire once per install, matching the nudges above.
+echo
+if command -v rockie >/dev/null 2>&1; then
+  cat <<'EOF'
+skill catalog: the rockie CLI is installed — your agent can pull from
+  ~300 platform skills on demand (they stay out of context until needed):
+    rockie skill catalog --search grpo --json
+    rockie skill pull grpo-rl-training --out .agents/skills/grpo-rl-training
+  Pulled skills are usable immediately. See $find-skills for the full flow.
+EOF
+else
+  cat <<'EOF'
+optional: the rockie CLI lets your agent pull from ~300 platform skills
+  (ML training/inference, biology, chemistry, physics, databases, coding)
+  on demand instead of keeping them all in context:
+    curl -fsSL https://rockielab.com/install.sh | sh && rockie auth login
+  Everything above works without it. See $find-skills for the full flow.
+EOF
+fi
+
 echo
 echo "✓ rockie-codex install complete."
