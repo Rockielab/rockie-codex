@@ -660,7 +660,7 @@ if grep -q '\.agents/skills' "$FS" && ! grep -q '\.claude/skills' "$FS"; then
 else
   fail "find-skills must target .agents/skills and never .claude/skills"
 fi
-if grep -q '\$find-skills' "$FS" && grep -q '\$serving-llms-vllm' "$FS"; then
+if grep -qF "\$find-skills" "$FS" && grep -qF "\$serving-llms-vllm" "$FS"; then
   ok "find-skills uses Codex \$skill invocation, not /slash"
 else
   fail "find-skills must use \$skill invocation (EVENT-MAPPING skill delta)"
