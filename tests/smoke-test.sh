@@ -561,6 +561,29 @@ echo "$BOOTSTRAP_OUT" | grep -q '\[RANDOM_DOC\.md\].*NEW \.md file' && ok "clean
 (cd "$PROJ" && git reset -q AGENTS.md RANDOM_DOC.md)
 rm -f "$PROJ/AGENTS.md" "$PROJ/RANDOM_DOC.md" "$PROJ"/.codex/.state/clean-ok-*
 
+# Bug 2 extension (dogfooding follow-up, ported from rockie-claude): the
+# harness's own AGENTS.md template instructs every project to maintain
+# STATE.md and EXPERIMENT_LOG.md at repo root, and every repo needs a
+# README — yet $clean blocked exactly those three on a first real
+# commit. All four harness-mandated root docs must pass; the rule must
+# still block a same-named file nested in a subdirectory, and an
+# arbitrary new root doc.
+for name in STATE.md EXPERIMENT_LOG.md README.md AGENTS.md; do
+  echo "# $name" > "$PROJ/$name"
+done
+mkdir -p "$PROJ/docs"
+echo "# nested" > "$PROJ/docs/STATE.md"
+echo "# notes" > "$PROJ/notes.md"
+(cd "$PROJ" && git add STATE.md EXPERIMENT_LOG.md README.md AGENTS.md docs/STATE.md notes.md)
+ROOT_MD_OUT=$(cd "$PROJ" && python3 .agents/skills/clean/audit.py --scope staged 2>&1)
+for name in STATE.md EXPERIMENT_LOG.md README.md AGENTS.md; do
+  echo "$ROOT_MD_OUT" | grep -q "\\[$name\\]" && fail "clean audit.py: root $name still flagged as a new-.md blocker" || ok "clean audit.py: root $name exempt from the new-.md blocker"
+done
+echo "$ROOT_MD_OUT" | grep -q '\[docs/STATE\.md\].*NEW \.md file' && ok "clean audit.py: nested docs/STATE.md still blocks (root-only exemption)" || fail "clean audit.py: nested docs/STATE.md incorrectly exempted"
+echo "$ROOT_MD_OUT" | grep -q '\[notes\.md\].*NEW \.md file' && ok "clean audit.py: arbitrary root notes.md still blocks" || fail "clean audit.py: arbitrary root notes.md incorrectly exempted"
+(cd "$PROJ" && git reset -q STATE.md EXPERIMENT_LOG.md README.md AGENTS.md docs/STATE.md notes.md)
+rm -rf "$PROJ/STATE.md" "$PROJ/EXPERIMENT_LOG.md" "$PROJ/README.md" "$PROJ/AGENTS.md" "$PROJ/docs" "$PROJ/notes.md" "$PROJ"/.codex/.state/clean-ok-*
+
 # Bug 1, worktree manifestation: `.codex/.state/` is gitignored, so
 # `git worktree add` does NOT copy it — each worktree starts with its own
 # empty `.state/`. audit.py must self-locate to THAT worktree's own
