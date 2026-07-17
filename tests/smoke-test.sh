@@ -406,6 +406,99 @@ bash "$PROJ/.codex/scripts/dry_run_gate.sh" register "$PROJ/src/real_train.py" >
 echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
 assert "pre-train-gate: real training script passes once dry-run sentinel registered" "0" "$?"
 
+# ── Regression coverage: pre-train-gate .py-extraction bug (ported from
+# Rockielab/rockie-claude, dogfooding report on a downstream install) ─────
+# Root cause: (a) extraction took the LAST .py-looking token in the WHOLE
+# command instead of the one belonging to the launcher's OWN invocation, so
+# an unrelated later token (e.g. from `find -name "journal.py"`) could
+# hijack extraction away from the script actually being launched; (b) the
+# extraction regex matched quote characters, so a quoted arg came out as
+# `"journal.py` (stray leading quote) — a malformed path that made
+# dry_run_gate.sh hard-error ("no such script") instead of cleanly
+# passing or failing.
+section "pre-train-gate: launcher-owned .py extraction"
+
+# (a) The exact repro command: a compound command where `python3
+# .codex/scripts/calibration.py --help` is the real launch, but a later
+# `find -name "journal.py"` clause used to hijack extraction and block it.
+REPRO_CMD='ls .codex/scripts/ | head -20; echo "---"; ls STATE.md EXPERIMENT_LOG.md 2>&1; echo "---"; python3 .codex/scripts/calibration.py --help 2>&1 | head -10 || find .codex -name "calibration.py" -o -name "journal.py" | head -5'
+IN=$(python3 -c "import json,sys;print(json.dumps({'tool_input':{'command':sys.argv[1],'cwd':sys.argv[2]}}))" "$REPRO_CMD" "$PROJ")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: exact dogfooding repro command passes" "0" "$?"
+
+# (b) `find . -name "train.py"` alone (no launcher word present) must pass.
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'find . -name \"train.py\"','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: find -name train.py alone passes (no launcher word)" "0" "$?"
+
+# (c) No regression: a real, un-registered train.py is still BLOCKED.
+# Distinct content from src/real_train.py (already registered above) —
+# dry_run_gate keys sentinels by content hash, not path, so reusing
+# identical content would falsely "pre-register" this file too.
+cat > "$PROJ/src/real_train2.py" <<'EOF'
+import torch
+# distinct marker: extraction-regression-test
+model = torch.nn.Linear(6, 6)
+loss = model(torch.randn(6)).sum()
+loss.backward()
+EOF
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 src/real_train2.py','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: real un-registered train.py still blocked (no regression)" "2" "$?"
+
+# (d) Quoted script paths extract correctly (quotes stripped) and are
+# still subject to the normal sentinel check — quoting is not a bypass.
+cat > "$PROJ/quoted_train.py" <<'EOF'
+import torch
+# distinct marker: quoted-path-test
+model = torch.nn.Linear(7, 7)
+loss = model(torch.randn(7)).sum()
+loss.backward()
+EOF
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 \"quoted_train.py\"','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: quoted script path (python3 \"quoted_train.py\") blocked when real+unregistered" "2" "$?"
+bash "$PROJ/.codex/scripts/dry_run_gate.sh" register "$PROJ/quoted_train.py" >/dev/null
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: quoted script path passes once registered (quotes stripped correctly)" "0" "$?"
+
+# (e) Harness-internal utility scripts (.codex/scripts/*.py in the
+# installed layout) must never trip the gate.
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 .codex/scripts/calibration.py --help','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: .codex/scripts/calibration.py passes (harness-script exemption)" "0" "$?"
+
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 .codex/scripts/journal.py --help','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: .codex/scripts/journal.py passes (harness-script exemption)" "0" "$?"
+
+# torchrun: the script is not the token immediately after the launcher
+# (flags in between) — extraction must still find it, and the sentinel
+# check still applies (this is not a bypass).
+mkdir -p "$PROJ/src3"
+cat > "$PROJ/src3/train.py" <<'EOF'
+import torch
+# distinct marker: torchrun-flags-test
+model = torch.nn.Linear(9, 9)
+loss = model(torch.randn(9)).sum()
+loss.backward()
+EOF
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'torchrun --nproc-per-node 8 src3/train.py --arg X','cwd':'$PROJ'}}))")
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: torchrun with flags between launcher and script blocked when unregistered" "2" "$?"
+bash "$PROJ/.codex/scripts/dry_run_gate.sh" register "$PROJ/src3/train.py" >/dev/null
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: torchrun with flags between launcher and script passes once registered" "0" "$?"
+
+# A genuinely nonexistent extracted path must fail OPEN with a clear
+# stderr note, not fall through to dry_run_gate.sh's "no such script"
+# hard error (the original bug's exact symptom).
+IN=$(python3 -c "import json;print(json.dumps({'tool_input':{'command':'python3 totally_bogus_nonexistent_script.py','cwd':'$PROJ'}}))")
+ERR=$(echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" 2>&1 >/dev/null)
+echo "$IN" | bash "$PROJ/.codex/hooks/pre-train-gate.sh" >/dev/null 2>&1
+assert "pre-train-gate: nonexistent extracted path fails open (exit 0)" "0" "$?"
+echo "$ERR" | grep -q "not a file on disk" && ok "pre-train-gate: nonexistent path fail-open has a clear stderr note" || fail "pre-train-gate: nonexistent path fail-open stderr note missing"
+
 # ── 14. Pre-commit gate (clean hash) ─────────────────────────────────────
 section "pre-commit gate"
 echo "something" > "$PROJ/new_file.txt"
@@ -476,6 +569,12 @@ rm -f "$PROJ/AGENTS.md" "$PROJ/RANDOM_DOC.md" "$PROJ"/.codex/.state/clean-ok-*
 WTBASE=$(mktemp -d -t rockie-worktree-XXXXXX)
 mkdir -p "$WTBASE/main/.codex" "$WTBASE/main/.agents/skills"
 (cd "$WTBASE/main" && git init -q)
+# Local identity for this throwaway repo — CI runners have no global git
+# config, and the real `git commit` a few lines down (unlike the rest of
+# this suite, which only feeds JSON to hooks) needs one or fails with
+# "empty ident name", which cascades into `git worktree add` never
+# creating $WTBASE/wt and four unrelated assertion failures below.
+(cd "$WTBASE/main" && git config user.email "smoke@rockie.test" && git config user.name "rockie smoke test")
 rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/codex/" "$WTBASE/main/.codex/" >/dev/null
 rsync -a --exclude='__pycache__' "$ROCKIE/project-extension/agents/skills/" "$WTBASE/main/.agents/skills/" >/dev/null
 chmod +x "$WTBASE/main/.codex/hooks/"*.sh "$WTBASE/main/.codex/scripts/"*.sh 2>/dev/null
